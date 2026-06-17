@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import re
 import sys
+from typing import Protocol
 
 import anthropic
 
@@ -12,6 +15,102 @@ from difflux.prompt import SYSTEM_PROMPT, build_user_message, render_hunks
 
 class ClusteringError(Exception):
     pass
+
+
+class _Provider(Protocol):
+    def call(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        user_message: str,
+        tool_schema: dict,
+    ) -> dict: ...
+
+
+class _AnthropicProvider:
+    def __init__(self, api_key: str | None) -> None:
+        self._client = anthropic.Anthropic(api_key=api_key or None)
+
+    def call(self, *, model: str, system_prompt: str, user_message: str, tool_schema: dict) -> dict:
+        tool_def = {
+            "name": "return_clustering",
+            "description": "Return the clustered diff analysis.",
+            "input_schema": tool_schema,
+        }
+        response = self._client.messages.create(
+            model=model,
+            max_tokens=4096,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+            tools=[tool_def],
+            tool_choice={"type": "any"},
+        )
+        for block in response.content:
+            if block.type == "tool_use" and block.name == "return_clustering":
+                return block.input  # already a dict
+        raise ClusteringError("LLM did not call return_clustering — check model and API key")
+
+
+def _is_o_series(model: str) -> bool:
+    return bool(re.match(r"^o\d", model))
+
+
+class _OpenAIProvider:
+    def __init__(self, api_key: str | None) -> None:
+        try:
+            from openai import OpenAI  # noqa: PLC0415
+            self._client = OpenAI(api_key=api_key or None)
+        except ImportError:
+            raise ClusteringError(
+                "openai package is not installed. Run: pip install 'difflux[openai]'"
+            ) from None
+
+    def call(self, *, model: str, system_prompt: str, user_message: str, tool_schema: dict) -> dict:
+        tool_def = {
+            "type": "function",
+            "function": {
+                "name": "return_clustering",
+                "description": "Return the clustered diff analysis.",
+                "parameters": tool_schema,
+            },
+        }
+        # o-series reasoning models require max_completion_tokens; other models use max_tokens
+        token_limit_kwarg = "max_completion_tokens" if _is_o_series(model) else "max_tokens"
+        response = self._client.chat.completions.create(
+            model=model,
+            **{token_limit_kwarg: 4096},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            tools=[tool_def],
+            tool_choice={"type": "function", "function": {"name": "return_clustering"}},
+        )
+        for choice in response.choices:
+            if choice.message.tool_calls:
+                for tc in choice.message.tool_calls:
+                    if tc.function.name == "return_clustering":
+                        return json.loads(tc.function.arguments)
+        raise ClusteringError("LLM did not call return_clustering — check model and API key")
+
+
+def _detect_provider(model: str) -> str:
+    if model.startswith("claude"):
+        return "anthropic"
+    if model.startswith("gpt-") or re.match(r"^o\d", model):
+        return "openai"
+    raise ClusteringError(
+        f"Cannot detect provider from model '{model}'. Use --provider or DIFFLUX_PROVIDER."
+    )
+
+
+def _make_provider(name: str, api_key: str | None) -> _Provider:
+    if name == "anthropic":
+        return _AnthropicProvider(api_key)
+    if name == "openai":
+        return _OpenAIProvider(api_key)
+    raise ClusteringError(f"Unknown provider '{name}'. Choose 'anthropic' or 'openai'.")
 
 
 def _truncate_hunks(hunks: list[Hunk]) -> list[Hunk]:
@@ -28,7 +127,6 @@ def _truncate_hunks(hunks: list[Hunk]) -> list[Hunk]:
     rendered = render_hunks(hunks)
     est_tokens = len(rendered) // 4
     if est_tokens > TOKEN_CEILING:
-        # Pop from the end until we fit
         while hunks and len(render_hunks(hunks)) // 4 > TOKEN_CEILING:
             dropped_hunk = hunks.pop()
         print(
@@ -47,33 +145,22 @@ def cluster(
     model: str = DEFAULT_MODEL,
     api_key: str | None = None,
     correction_hint: str | None = None,
+    provider: str | None = None,
 ) -> ClusteringResult:
     hunks = _truncate_hunks(list(hunks))
 
-    client = anthropic.Anthropic(api_key=api_key or None)
+    provider_name = provider or _detect_provider(model)
+    p = _make_provider(provider_name, api_key)
 
-    tool_def = {
-        "name": "return_clustering",
-        "description": "Return the clustered diff analysis.",
-        "input_schema": ClusteringResult.model_json_schema(),
-    }
-
-    response = client.messages.create(
+    raw = p.call(
         model=model,
-        max_tokens=4096,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": build_user_message(hunks, correction_hint)}],
-        tools=[tool_def],
-        tool_choice={"type": "any"},
+        system_prompt=SYSTEM_PROMPT,
+        user_message=build_user_message(hunks, correction_hint),
+        tool_schema=ClusteringResult.model_json_schema(),
     )
-
-    for block in response.content:
-        if block.type == "tool_use" and block.name == "return_clustering":
-            result = ClusteringResult.model_validate(block.input)
-            _validate_hunk_ids(result, hunks)
-            return result
-
-    raise ClusteringError("LLM did not call return_clustering — check model and API key")
+    result = ClusteringResult.model_validate(raw)
+    _validate_hunk_ids(result, hunks)
+    return result
 
 
 def _validate_hunk_ids(result: ClusteringResult, hunks: list[Hunk]) -> None:

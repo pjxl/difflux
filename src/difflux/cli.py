@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from difflux.config import ANTHROPIC_API_KEY, DEFAULT_MODEL, GITHUB_TOKEN
+from difflux.config import ANTHROPIC_API_KEY, DEFAULT_MODEL, DIFFLUX_PROVIDER, GITHUB_TOKEN
 from difflux.hunks import HunkIndex, parse_diff
 from difflux.enrich import build_session
 from difflux.render_text import render_overview
@@ -20,7 +20,14 @@ def _make_arg_parser() -> argparse.ArgumentParser:
         help="GitHub PR URL (e.g. https://github.com/owner/repo/pull/123). "
              "Omit to read a diff from stdin.",
     )
-    p.add_argument("--model", default=None, help="Override the Claude model to use.")
+    p.add_argument("--model", default=None, help="Override the model to use.")
+    p.add_argument(
+        "--provider",
+        default=None,
+        choices=["anthropic", "openai"],
+        help="LLM provider. Auto-detected from model name if omitted. "
+             "Also set via DIFFLUX_PROVIDER env var.",
+    )
     p.add_argument("--no-tui", action="store_true", help="Print plain text instead of launching the TUI.")
     return p
 
@@ -45,6 +52,7 @@ def _resolve_diff(source: str | None) -> str:
 def main() -> None:
     args = _make_arg_parser().parse_args()
     model = args.model or DEFAULT_MODEL
+    provider = args.provider or DIFFLUX_PROVIDER or None
 
     diff_text = _resolve_diff(args.source)
     hunks = parse_diff(diff_text)
@@ -54,12 +62,11 @@ def main() -> None:
         sys.exit(0)
 
     from difflux.clusterer import cluster
-    from difflux.config import ANTHROPIC_API_KEY
 
     api_key = ANTHROPIC_API_KEY or None
 
     def run_clustering():
-        result = cluster(hunks, model=model, api_key=api_key)
+        result = cluster(hunks, model=model, api_key=api_key, provider=provider)
         index = HunkIndex(hunks)
         return build_session(result, index)
 
