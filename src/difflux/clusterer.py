@@ -95,7 +95,7 @@ class _OpenAIProvider:
         raise ClusteringError("LLM did not call return_clustering — check model and API key")
 
 
-def _detect_provider(model: str) -> str:
+def detect_provider(model: str) -> str:
     if model.startswith("claude"):
         return "anthropic"
     if model.startswith("gpt-") or re.match(r"^o\d", model):
@@ -149,7 +149,7 @@ def cluster(
 ) -> ClusteringResult:
     hunks = _truncate_hunks(list(hunks))
 
-    provider_name = provider or _detect_provider(model)
+    provider_name = provider or detect_provider(model)
     p = _make_provider(provider_name, api_key)
 
     raw = p.call(

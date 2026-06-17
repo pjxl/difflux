@@ -101,6 +101,10 @@ git diff HEAD~1 | difflux --no-tui
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | Anthropic API key |
+| `ANTHROPIC_API_KEY` | Yes* | Anthropic API key |
+| `OPENAI_API_KEY` | Yes* | OpenAI API key (required when using GPT or o-series models) |
 | `GITHUB_TOKEN` | No | GitHub personal access token for private repos |
-| `DIFFLUX_MODEL` | No | Claude model to use (default: `claude-opus-4-8`) |
+| `DIFFLUX_MODEL` | No | Model to use (default: `claude-opus-4-8`) |
+| `DIFFLUX_PROVIDER` | No | `anthropic` or `openai`; auto-detected from model name |
+
+\* One of `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is required depending on the model.

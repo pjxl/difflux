@@ -3,7 +3,14 @@ from __future__ import annotations
 import argparse
 import sys
 
-from difflux.config import ANTHROPIC_API_KEY, DEFAULT_MODEL, DIFFLUX_PROVIDER, GITHUB_TOKEN
+from difflux.config import (
+    ANTHROPIC_API_KEY,
+    DEFAULT_MODEL,
+    DIFFLUX_PROVIDER,
+    GITHUB_TOKEN,
+    OPENAI_API_KEY,
+)
+from difflux.clusterer import ClusteringError, detect_provider
 from difflux.hunks import HunkIndex, parse_diff
 from difflux.enrich import build_session
 from difflux.render_text import render_overview
@@ -20,7 +27,7 @@ def _make_arg_parser() -> argparse.ArgumentParser:
         help="GitHub PR URL (e.g. https://github.com/owner/repo/pull/123). "
              "Omit to read a diff from stdin.",
     )
-    p.add_argument("--model", default=None, help="Override the model to use.")
+    p.add_argument("--model", default=None, help="Override the model to use. Also set via DIFFLUX_MODEL env var.")
     p.add_argument(
         "--provider",
         default=None,
@@ -49,12 +56,43 @@ def _resolve_diff(source: str | None) -> str:
     sys.exit(1)
 
 
+def _check_api_key(provider: str | None, model: str) -> None:
+    if provider is None:
+        try:
+            provider = detect_provider(model)
+        except ClusteringError as e:
+            print(f"difflux: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    if provider == "anthropic" and not ANTHROPIC_API_KEY:
+        print("difflux: ANTHROPIC_API_KEY is not set.", file=sys.stderr)
+        print(
+            "  export ANTHROPIC_API_KEY=sk-ant-...  (get a key at https://console.anthropic.com/)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if provider == "openai" and not OPENAI_API_KEY:
+        print("difflux: OPENAI_API_KEY is not set.", file=sys.stderr)
+        print(
+            "  export OPENAI_API_KEY=sk-...  (get a key at https://platform.openai.com/)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def main() -> None:
     args = _make_arg_parser().parse_args()
     model = args.model or DEFAULT_MODEL
     provider = args.provider or DIFFLUX_PROVIDER or None
 
-    diff_text = _resolve_diff(args.source)
+    _check_api_key(provider, model)
+
+    try:
+        diff_text = _resolve_diff(args.source)
+    except RuntimeError as e:
+        print(f"difflux: {e}", file=sys.stderr)
+        sys.exit(1)
     hunks = parse_diff(diff_text)
 
     if not hunks:
@@ -63,14 +101,20 @@ def main() -> None:
 
     from difflux.clusterer import cluster
 
-    api_key = ANTHROPIC_API_KEY or None
-
     def run_clustering():
-        result = cluster(hunks, model=model, api_key=api_key, provider=provider)
+        result = cluster(hunks, model=model, provider=provider)
         index = HunkIndex(hunks)
         return build_session(result, index)
 
-    session = run_clustering()
+    try:
+        session = run_clustering()
+    except ClusteringError as e:
+        print(f"difflux: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        # Catch auth errors and other SDK exceptions
+        print(f"difflux: {e}", file=sys.stderr)
+        sys.exit(1)
 
     use_tui = not args.no_tui and sys.stdout.isatty()
 
