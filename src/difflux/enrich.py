@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from scc.hunks import Hunk, HunkIndex
-from scc.models import Cluster, ClusteringResult, ClusteringType
+from difflux.hunks import Hunk, HunkIndex
+from difflux.models import Cluster, ClusteringResult, ClusteringType
 
 
 @dataclass

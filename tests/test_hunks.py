@@ -1,6 +1,6 @@
 """Tests for hunks.py — diff parser. All use inline diffs; no network or API needed."""
 
-from scc.hunks import parse_diff, HunkIndex
+from difflux.hunks import parse_diff, HunkIndex
 
 SIMPLE_DIFF = """\
 diff --git a/src/auth.py b/src/auth.py

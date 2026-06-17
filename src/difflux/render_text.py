@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from scc.enrich import ClusterView, ReviewSession
+from difflux.enrich import ClusterView, ReviewSession
 
 
 def render_overview(session: ReviewSession) -> str:
-    lines = [f"scc · {len(session.clusters)} clusters · {session.total_files} files\n"]
+    lines = [f"difflux · {len(session.clusters)} clusters · {session.total_files} files\n"]
     for i, v in enumerate(session.clusters, 1):
         mark = "✓" if v.reviewed else " "
         lines.append(

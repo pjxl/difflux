@@ -5,8 +5,8 @@ from textual.screen import Screen
 from textual.widgets import Static, Footer
 from textual.containers import VerticalScroll
 
-from scc.enrich import ClusterView, ReviewSession
-from scc.tui.widgets import HunkBlock
+from difflux.enrich import ClusterView, ReviewSession
+from difflux.tui.widgets import HunkBlock
 
 
 class DrillDownScreen(Screen):
@@ -54,7 +54,7 @@ class SingleIdeaScreen(Screen):
         s = self._session
         note = s.note or "This diff is a single uniform operation — no conceptual separation to show."
         yield Static(
-            f"[bold]scc[/bold] · single idea\n\n{note}\n\n"
+            f"[bold]difflux[/bold] · single idea\n\n{note}\n\n"
             f"[dim]{s.total_hunks} hunks · {s.total_files} files[/dim]",
             markup=True,
         )

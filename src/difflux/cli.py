@@ -3,15 +3,15 @@ from __future__ import annotations
 import argparse
 import sys
 
-from scc.config import ANTHROPIC_API_KEY, DEFAULT_MODEL, GITHUB_TOKEN
-from scc.hunks import HunkIndex, parse_diff
-from scc.enrich import build_session
-from scc.render_text import render_overview
+from difflux.config import ANTHROPIC_API_KEY, DEFAULT_MODEL, GITHUB_TOKEN
+from difflux.hunks import HunkIndex, parse_diff
+from difflux.enrich import build_session
+from difflux.render_text import render_overview
 
 
 def _make_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="scc",
+        prog="difflux",
         description="Decompose a git diff into conceptual clusters for review.",
     )
     p.add_argument(
@@ -28,17 +28,17 @@ def _make_arg_parser() -> argparse.ArgumentParser:
 def _resolve_diff(source: str | None) -> str:
     if source is None:
         if sys.stdin.isatty():
-            print("scc: pipe a git diff or provide a GitHub PR URL.", file=sys.stderr)
-            print("  example: git diff HEAD~1 | scc", file=sys.stderr)
+            print("difflux: pipe a git diff or provide a GitHub PR URL.", file=sys.stderr)
+            print("  example: git diff HEAD~1 | difflux", file=sys.stderr)
             sys.exit(1)
-        from scc.sources.stdin import read_stdin
+        from difflux.sources.stdin import read_stdin
         return read_stdin()
 
-    from scc.sources.github import is_github_pr_url, fetch_pr_diff
+    from difflux.sources.github import is_github_pr_url, fetch_pr_diff
     if is_github_pr_url(source):
         return fetch_pr_diff(source, token=GITHUB_TOKEN)
 
-    print(f"scc: unrecognised source '{source}'. Expected a GitHub PR URL or no argument (stdin).", file=sys.stderr)
+    print(f"difflux: unrecognised source '{source}'. Expected a GitHub PR URL or no argument (stdin).", file=sys.stderr)
     sys.exit(1)
 
 
@@ -50,11 +50,11 @@ def main() -> None:
     hunks = parse_diff(diff_text)
 
     if not hunks:
-        print("scc: diff is empty — nothing to cluster.", file=sys.stderr)
+        print("difflux: diff is empty — nothing to cluster.", file=sys.stderr)
         sys.exit(0)
 
-    from scc.clusterer import cluster
-    from scc.config import ANTHROPIC_API_KEY
+    from difflux.clusterer import cluster
+    from difflux.config import ANTHROPIC_API_KEY
 
     api_key = ANTHROPIC_API_KEY or None
 
@@ -68,8 +68,8 @@ def main() -> None:
     use_tui = not args.no_tui and sys.stdout.isatty()
 
     if use_tui:
-        from scc.tui.app import SCCApp
-        app = SCCApp(session=session, regenerate=run_clustering)
+        from difflux.tui.app import DiffluxApp
+        app = DiffluxApp(session=session, regenerate=run_clustering)
         app.run()
         n_reviewed = sum(1 for v in session.clusters if v.reviewed)
         print(f"Reviewed {n_reviewed} clusters, {session.total_files} files")

@@ -4,11 +4,11 @@ from typing import Callable
 
 from textual.app import App
 
-from scc.enrich import ReviewSession
-from scc.models import ClusteringType
+from difflux.enrich import ReviewSession
+from difflux.models import ClusteringType
 
 
-class SCCApp(App):
+class DiffluxApp(App):
 
     CSS = """
     Screen {
@@ -48,8 +48,8 @@ class SCCApp(App):
         self._regenerate = regenerate
 
     def on_mount(self) -> None:
-        from scc.tui.overview import OverviewScreen
-        from scc.tui.drilldown import SingleIdeaScreen
+        from difflux.tui.overview import OverviewScreen
+        from difflux.tui.drilldown import SingleIdeaScreen
 
         if self.session.clustering_type == ClusteringType.SINGLE_IDEA:
             self.push_screen(SingleIdeaScreen(self.session))

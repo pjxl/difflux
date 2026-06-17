@@ -10,8 +10,8 @@ from textual.screen import Screen
 from textual.widgets import Static, Footer, LoadingIndicator
 from textual.containers import VerticalScroll
 
-from scc.enrich import ClusterView, ReviewSession
-from scc.tui.widgets import ClusterCard, HelpModal
+from difflux.enrich import ClusterView, ReviewSession
+from difflux.tui.widgets import ClusterCard, HelpModal
 
 
 class OverviewScreen(Screen):
@@ -59,7 +59,7 @@ class OverviewScreen(Screen):
         s = self.session
         header = self.query_one("#overview-header", Static)
         header.update(
-            f"[bold]scc[/bold]  ·  {len(s.clusters)} clusters  ·  {s.total_files} files",
+            f"[bold]difflux[/bold]  ·  {len(s.clusters)} clusters  ·  {s.total_files} files",
         )
         rule = "─" * 58
         self.query_one("#rule-top", Static).update(rule)
@@ -97,7 +97,7 @@ class OverviewScreen(Screen):
         if not cards:
             return
         view = self.session.clusters[self._focused_index]
-        from scc.tui.drilldown import DrillDownScreen
+        from difflux.tui.drilldown import DrillDownScreen
         self.app.push_screen(DrillDownScreen(view))
 
     def action_toggle_reviewed(self) -> None:

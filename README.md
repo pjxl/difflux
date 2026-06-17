@@ -1,4 +1,4 @@
-# scc — semantic change clustering
+# difflux — semantic change clustering
 
 Decompose a git diff into conceptual clusters for review.
 
@@ -6,7 +6,7 @@ Decompose a git diff into conceptual clusters for review.
 
 Standard diff tools present changes in file order. File order has no relationship to conceptual order or to where the risk lives. A 40-file agent-generated PR might interleave a rename, a core feature, and incidental reformatting across dozens of files — and the file tree gives you no signal about which is which, or what to read first.
 
-`scc` sends the diff to a language model, which identifies the conceptual clusters, assigns each hunk to one, and orders them in the sequence that builds understanding. You see the shape of the change before you read a line of it.
+`difflux` sends the diff to a language model, which identifies the conceptual clusters, assigns each hunk to one, and orders them in the sequence that builds understanding. You see the shape of the change before you read a line of it.
 
 ## Example
 
@@ -14,7 +14,7 @@ Consider a commit that changes how Enter behaves in a slash-command completion d
 
 A conventional diff presents them in file order — `tests/test_tui.py` first, then `tui.py` — so you read the updated test assertions before you've seen the implementation change that makes that behavior possible.
 
-`scc` reorders the same hunks into three clusters:
+`difflux` reorders the same hunks into three clusters:
 
 ```
 1. Core behavior change        tui.py · 1 hunk
@@ -35,13 +35,13 @@ In a two-file diff the gain is modest. In a 50-file agent PR the reordering is t
 ## Installation
 
 ```sh
-pipx install scc
+pipx install difflux
 ```
 
 Or with pip:
 
 ```sh
-pip install scc
+pip install difflux
 ```
 
 Requires Python 3.11+.
@@ -65,20 +65,20 @@ export GITHUB_TOKEN=ghp_...
 Pipe a diff from stdin (primary mode):
 
 ```sh
-git diff HEAD~1 | scc
-git diff main...feature-branch | scc
+git diff HEAD~1 | difflux
+git diff main...feature-branch | difflux
 ```
 
 Pass a GitHub PR URL directly:
 
 ```sh
-scc https://github.com/owner/repo/pull/123
+difflux https://github.com/owner/repo/pull/123
 ```
 
 For plain-text output instead of the TUI:
 
 ```sh
-git diff HEAD~1 | scc --no-tui
+git diff HEAD~1 | difflux --no-tui
 ```
 
 ## Keybindings
@@ -95,7 +95,7 @@ git diff HEAD~1 | scc --no-tui
 
 ## How it works
 
-`scc` numbers each hunk in the diff and sends them to a Claude model with a structured-output prompt. The model identifies conceptual clusters, assigns each hunk to one, orders the clusters in the reading sequence that best builds understanding (entry point → core logic → edge handling → tests), and writes a one-sentence summary per cluster. The result is a two-phase TUI: an overview listing all clusters with their summaries, hunk counts, and file counts; and a drill-down view that shows the actual diff hunks for a selected cluster, gathered from wherever in the file tree they happen to live.
+`difflux` numbers each hunk in the diff and sends them to a Claude model with a structured-output prompt. The model identifies conceptual clusters, assigns each hunk to one, orders the clusters in the reading sequence that best builds understanding (entry point → core logic → edge handling → tests), and writes a one-sentence summary per cluster. The result is a two-phase TUI: an overview listing all clusters with their summaries, hunk counts, and file counts; and a drill-down view that shows the actual diff hunks for a selected cluster, gathered from wherever in the file tree they happen to live.
 
 ## Configuration
 
@@ -103,4 +103,4 @@ git diff HEAD~1 | scc --no-tui
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Yes | Anthropic API key |
 | `GITHUB_TOKEN` | No | GitHub personal access token for private repos |
-| `SCC_MODEL` | No | Claude model to use (default: `claude-opus-4-8`) |
+| `DIFFLUX_MODEL` | No | Claude model to use (default: `claude-opus-4-8`) |

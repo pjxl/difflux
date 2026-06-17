@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scc.hunks import Hunk
+from difflux.hunks import Hunk
 
 SYSTEM_PROMPT = """\
 You are a code-review assistant. You are given a single git diff broken into

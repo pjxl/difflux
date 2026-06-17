@@ -5,8 +5,8 @@ from textual.widgets import Static, Label
 from textual.containers import VerticalScroll
 from rich.syntax import Syntax
 
-from scc.enrich import ClusterView
-from scc.hunks import Hunk
+from difflux.enrich import ClusterView
+from difflux.hunks import Hunk
 
 
 class ClusterCard(Static):
@@ -89,7 +89,7 @@ class HelpModal(Static):
 
     def render(self) -> str:
         return (
-            "[bold]scc keyboard shortcuts[/bold]\n\n"
+            "[bold]difflux keyboard shortcuts[/bold]\n\n"
             " [bold]j / k[/bold]  or  [bold]↑ / ↓[/bold]   navigate clusters\n"
             " [bold]Enter[/bold]              drill into cluster\n"
             " [bold]Space[/bold]              mark cluster reviewed\n"

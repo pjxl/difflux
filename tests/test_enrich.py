@@ -1,8 +1,8 @@
 """Tests for enrich.py — local count derivation and view model construction."""
 
-from scc.hunks import Hunk, HunkIndex
-from scc.models import Cluster, ClusteringResult, ClusteringType
-from scc.enrich import build_session, ClusterView, ReviewSession
+from difflux.hunks import Hunk, HunkIndex
+from difflux.models import Cluster, ClusteringResult, ClusteringType
+from difflux.enrich import build_session, ClusterView, ReviewSession
 
 
 def _hunk(id: int, file_path: str = "src/foo.py", body: str = "+add\n-remove\n ctx") -> Hunk:

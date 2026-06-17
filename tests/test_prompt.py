@@ -1,7 +1,7 @@
 """Tests for prompt.py — SYSTEM_PROMPT content and render_hunks output."""
 
-from scc.hunks import Hunk
-from scc.prompt import SYSTEM_PROMPT, render_hunks, build_user_message
+from difflux.hunks import Hunk
+from difflux.prompt import SYSTEM_PROMPT, render_hunks, build_user_message
 
 
 def _make_hunk(id: int, file_path: str = "src/foo.py", new_start: int = 10, new_count: int = 5) -> Hunk:

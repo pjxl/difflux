@@ -1,4 +1,4 @@
-# AGENTS.md — scc (semantic change clustering)
+# AGENTS.md — difflux (semantic change clustering)
 
 This file is for AI coding agents working in this repository. It covers project purpose,
 setup, architecture, and invariants that must be preserved. Read it before writing any code.
@@ -7,7 +7,7 @@ setup, architecture, and invariants that must be preserved. Read it before writi
 
 ## What this project is
 
-`scc` is a CLI tool that accepts a git diff (from stdin or a GitHub PR URL) and decomposes
+`difflux` is a CLI tool that accepts a git diff (from stdin or a GitHub PR URL) and decomposes
 it into conceptual clusters — groups of hunks that belong to the same idea — presented in
 a Textual terminal TUI so a reviewer can navigate the change by idea rather than by file.
 The tool is built on Python 3.11+, Textual (TUI), Pydantic (schema), and the Anthropic SDK
@@ -23,8 +23,8 @@ pip install -e ".[dev]"
 cp .env.example .env   # fill in ANTHROPIC_API_KEY
 ```
 
-The entry point is registered as `scc = "scc.cli:main"` in `pyproject.toml`.
-`python -m scc` also works via `src/scc/__main__.py`.
+The entry point is registered as `difflux = "difflux.cli:main"` in `pyproject.toml`.
+`python -m difflux` also works via `src/difflux/__main__.py`.
 
 ---
 
@@ -32,14 +32,14 @@ The entry point is registered as `scc = "scc.cli:main"` in `pyproject.toml`.
 
 ```bash
 pytest tests/          # full offline suite — no API key needed
-python -m scc          # requires ANTHROPIC_API_KEY and piped diff input
+python -m difflux          # requires ANTHROPIC_API_KEY and piped diff input
 ```
 
 To verify the diff parser alone:
 
 ```bash
 git diff HEAD~1 | python -c "
-from scc.hunks import parse_diff; import sys
+from difflux.hunks import parse_diff; import sys
 for h in parse_diff(sys.stdin.read()): print(h.id, h.file_path, h.new_start)
 "
 ```
@@ -50,24 +50,24 @@ for h in parse_diff(sys.stdin.read()): print(h.id, h.file_path, h.new_start)
 
 | File | Purpose |
 |---|---|
-| `src/scc/config.py` | Module-level constants: `DEFAULT_MODEL`, `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `HUNK_CEILING` (300), `TOKEN_CEILING` (150,000 estimated tokens). All env vars are read here and nowhere else. |
-| `src/scc/models.py` | Pydantic models that exactly mirror the JSON the LLM returns via tool use. Contains `Cluster`, `ClusteringResult`, and `ClusteringType`. No locally-derived fields live here — see invariants. |
-| `src/scc/hunks.py` | Parses a unified diff string into `Hunk` dataclass objects with stable 1-based IDs assigned in encounter order. Also defines `HunkIndex`, a `dict[int, Hunk]` wrapper used for ID-keyed lookup at drill-down time. Depends only on stdlib. |
-| `src/scc/prompt.py` | Holds `SYSTEM_PROMPT` verbatim and two functions: `render_hunks(hunks)` produces the numbered hunk block sent to the LLM; `build_user_message(hunks, correction_hint)` wraps it in the user message envelope. |
-| `src/scc/clusterer.py` | Makes the Anthropic SDK call. Sends the prompt, registers `return_clustering` as the sole tool, uses `tool_choice={"type": "any"}` to force a tool call, parses the response into a `ClusteringResult`, and validates that all returned hunk IDs exist in the local hunk list. Raises `ClusteringError` if the LLM does not call the tool. |
-| `src/scc/enrich.py` | Joins `ClusteringResult` with `HunkIndex` to produce `ClusterView` and `ReviewSession` — the view-model layer. Computes `file_count` and `line_count` locally from resolved hunks. These fields are never requested from the model. |
-| `src/scc/render_text.py` | Plain-text fallback renderer used when `--no-tui` is passed or stdout is not a tty. `render_overview(session)` prints the cluster list; `render_cluster(view)` prints a single cluster's hunk content. Never reads `position_rationale`. |
-| `src/scc/cli.py` | Arg parsing (`argparse`), input-source dispatch (stdin vs. GitHub PR URL), top-level orchestration: calls `parse_diff → cluster → build_session`, then routes to TUI or text renderer based on tty detection and `--no-tui`. On TUI exit, prints the session summary line to stdout. |
-| `src/scc/__main__.py` | One-liner: `from scc.cli import main; main()`. Enables `python -m scc`. |
-| `src/scc/__init__.py` | Empty package marker. |
-| `src/scc/sources/__init__.py` | Empty package marker. |
-| `src/scc/tui/__init__.py` | Empty package marker. |
-| `src/scc/sources/stdin.py` | `read_stdin() -> str` — reads the piped diff from `sys.stdin`. |
-| `src/scc/sources/github.py` | `is_github_pr_url(s)` and `fetch_pr_diff(url, token)` — fetches a unified diff from the GitHub REST API using `Accept: application/vnd.github.v3.diff`. Handles 404 (PR not found / private repo) and 406 (diff too large). |
-| `src/scc/tui/app.py` | `SCCApp(App)` — Textual application root. Routes on mount: `single_idea` goes to `SingleIdeaScreen`; `multi_cluster` goes to `OverviewScreen`. Holds the `regenerate` callback passed in from `cli.py`. |
-| `src/scc/tui/overview.py` | `OverviewScreen` — phase-one navigable cluster list. Keybindings: `j`/`k` navigate, `Enter` drills in, `Space` toggles reviewed, `r` regenerates (via `asyncio.to_thread` + Textual worker so the event loop is never blocked), `?` toggles help, `q`/`Esc` quits. |
-| `src/scc/tui/drilldown.py` | `DrillDownScreen` — phase-two view of a single cluster's hunks. `SingleIdeaScreen` — shown when `clustering_type` is `single_idea`; displays the `note` and raw hunks without a navigable overview. |
-| `src/scc/tui/widgets.py` | `ClusterCard` — one cluster row in the overview list, renders name/summary/metadata, tracks focus and reviewed state. `HunkBlock` — renders a single hunk with `rich.syntax.Syntax` diff highlighting. `HelpModal` — keyboard shortcut overlay. |
+| `src/difflux/config.py` | Module-level constants: `DEFAULT_MODEL`, `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `HUNK_CEILING` (300), `TOKEN_CEILING` (150,000 estimated tokens). All env vars are read here and nowhere else. |
+| `src/difflux/models.py` | Pydantic models that exactly mirror the JSON the LLM returns via tool use. Contains `Cluster`, `ClusteringResult`, and `ClusteringType`. No locally-derived fields live here — see invariants. |
+| `src/difflux/hunks.py` | Parses a unified diff string into `Hunk` dataclass objects with stable 1-based IDs assigned in encounter order. Also defines `HunkIndex`, a `dict[int, Hunk]` wrapper used for ID-keyed lookup at drill-down time. Depends only on stdlib. |
+| `src/difflux/prompt.py` | Holds `SYSTEM_PROMPT` verbatim and two functions: `render_hunks(hunks)` produces the numbered hunk block sent to the LLM; `build_user_message(hunks, correction_hint)` wraps it in the user message envelope. |
+| `src/difflux/clusterer.py` | Makes the Anthropic SDK call. Sends the prompt, registers `return_clustering` as the sole tool, uses `tool_choice={"type": "any"}` to force a tool call, parses the response into a `ClusteringResult`, and validates that all returned hunk IDs exist in the local hunk list. Raises `ClusteringError` if the LLM does not call the tool. |
+| `src/difflux/enrich.py` | Joins `ClusteringResult` with `HunkIndex` to produce `ClusterView` and `ReviewSession` — the view-model layer. Computes `file_count` and `line_count` locally from resolved hunks. These fields are never requested from the model. |
+| `src/difflux/render_text.py` | Plain-text fallback renderer used when `--no-tui` is passed or stdout is not a tty. `render_overview(session)` prints the cluster list; `render_cluster(view)` prints a single cluster's hunk content. Never reads `position_rationale`. |
+| `src/difflux/cli.py` | Arg parsing (`argparse`), input-source dispatch (stdin vs. GitHub PR URL), top-level orchestration: calls `parse_diff → cluster → build_session`, then routes to TUI or text renderer based on tty detection and `--no-tui`. On TUI exit, prints the session summary line to stdout. |
+| `src/difflux/__main__.py` | One-liner: `from difflux.cli import main; main()`. Enables `python -m difflux`. |
+| `src/difflux/__init__.py` | Empty package marker. |
+| `src/difflux/sources/__init__.py` | Empty package marker. |
+| `src/difflux/tui/__init__.py` | Empty package marker. |
+| `src/difflux/sources/stdin.py` | `read_stdin() -> str` — reads the piped diff from `sys.stdin`. |
+| `src/difflux/sources/github.py` | `is_github_pr_url(s)` and `fetch_pr_diff(url, token)` — fetches a unified diff from the GitHub REST API using `Accept: application/vnd.github.v3.diff`. Handles 404 (PR not found / private repo) and 406 (diff too large). |
+| `src/difflux/tui/app.py` | `DiffluxApp(App)` — Textual application root. Routes on mount: `single_idea` goes to `SingleIdeaScreen`; `multi_cluster` goes to `OverviewScreen`. Holds the `regenerate` callback passed in from `cli.py`. |
+| `src/difflux/tui/overview.py` | `OverviewScreen` — phase-one navigable cluster list. Keybindings: `j`/`k` navigate, `Enter` drills in, `Space` toggles reviewed, `r` regenerates (via `asyncio.to_thread` + Textual worker so the event loop is never blocked), `?` toggles help, `q`/`Esc` quits. |
+| `src/difflux/tui/drilldown.py` | `DrillDownScreen` — phase-two view of a single cluster's hunks. `SingleIdeaScreen` — shown when `clustering_type` is `single_idea`; displays the `note` and raw hunks without a navigable overview. |
+| `src/difflux/tui/widgets.py` | `ClusterCard` — one cluster row in the overview list, renders name/summary/metadata, tracks focus and reviewed state. `HunkBlock` — renders a single hunk with `rich.syntax.Syntax` diff highlighting. `HelpModal` — keyboard shortcut overlay. |
 | `tests/test_hunks.py` | Tests for `parse_diff` and `HunkIndex`. Covers: empty diff returns `[]`, sequential IDs starting at 1, correct file path extraction from `+++` line, deletion fallback to `a/`-side path, IDs incrementing across files, line number parsing, body content, verbatim header string, and `HunkIndex.by_ids` ordering and missing-ID handling. Uses inline diff strings; no fixture files loaded. |
 | `tests/test_models.py` | Tests for Pydantic schema validation. Covers: `multi_cluster` and `single_idea` result parse, cluster field access, `position_rationale` present in JSON schema, `file_count`/`line_count`/`position` absent from JSON schema, `too_large` not a valid `ClusteringType` value (raises `ValidationError`), `note` defaults to `None`, `coverage` optional. Uses inline Python dicts, not JSON strings or fixture files. |
 | `tests/test_prompt.py` | Tests for `SYSTEM_PROMPT`, `render_hunks`, and `build_user_message`. Covers: prompt is a non-empty string with required keywords (`CONCEPTUAL CLUSTERS`, `return_clustering`, `single_idea`, `position_rationale`, `ESCAPE HATCH`), `render_hunks` includes hunk ID/file/line/header/body, uses en-dash (`–`) in line ranges, separates hunks with blank lines, `build_user_message` includes hunk count and file count, omits `CORRECTION HINT` when not provided and includes it when provided, `render_hunks` never emits `position_rationale`. Uses `Hunk` objects constructed inline. |
@@ -112,7 +112,7 @@ stdin / GitHub PR URL
       → render_hunks(hunks) → user message        (prompt.py)
       → Anthropic SDK: tool_use → ClusteringResult (models.py, Pydantic)
   → build_session(result, index) → ReviewSession  (enrich.py)
-  → SCCApp(session, regenerate).run()             (tui/)
+  → DiffluxApp(session, regenerate).run()             (tui/)
       OR render_overview(session)                  (render_text.py)
 ```
 

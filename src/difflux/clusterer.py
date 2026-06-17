@@ -4,10 +4,10 @@ import sys
 
 import anthropic
 
-from scc.config import DEFAULT_MODEL, HUNK_CEILING, TOKEN_CEILING
-from scc.hunks import Hunk
-from scc.models import ClusteringResult
-from scc.prompt import SYSTEM_PROMPT, build_user_message, render_hunks
+from difflux.config import DEFAULT_MODEL, HUNK_CEILING, TOKEN_CEILING
+from difflux.hunks import Hunk
+from difflux.models import ClusteringResult
+from difflux.prompt import SYSTEM_PROMPT, build_user_message, render_hunks
 
 
 class ClusteringError(Exception):

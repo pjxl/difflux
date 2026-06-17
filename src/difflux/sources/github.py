@@ -34,6 +34,6 @@ def fetch_pr_diff(url: str, *, token: str | None = None) -> str:
     if resp.status_code == 404:
         raise RuntimeError("PR not found. Check the URL and set GITHUB_TOKEN for private repos.")
     if resp.status_code == 406:
-        raise RuntimeError("GitHub diff too large. Use: git diff | scc instead.")
+        raise RuntimeError("GitHub diff too large. Use: git diff | difflux instead.")
     resp.raise_for_status()
     return resp.text

@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from scc.models import Cluster, ClusteringResult, ClusteringType
+from difflux.models import Cluster, ClusteringResult, ClusteringType
 
 VALID_RESULT = {
     "clustering_type": "multi_cluster",
