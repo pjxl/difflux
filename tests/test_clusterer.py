@@ -13,6 +13,10 @@ from difflux.clusterer import (
 )
 
 
+def _make_openai_module(client_mock):
+    return MagicMock(OpenAI=client_mock)
+
+
 def _fake_model(model_id):
     m = MagicMock()
     m.id = model_id
@@ -134,3 +138,53 @@ class TestListModels:
             client.models.list.side_effect = RuntimeError("401 authentication failed")
             with pytest.raises(RuntimeError, match="401 authentication failed"):
                 list_models("anthropic", api_key="bad-key")
+
+
+class TestOpenAIToolChoice:
+    """_OpenAIProvider uses tool_choice="required" for universal compatibility."""
+
+    def _make_tool_call_response(self, arguments: str = '{"clusters": []}'):
+        tc = MagicMock()
+        tc.function.name = "return_clustering"
+        tc.function.arguments = arguments
+        choice = MagicMock()
+        choice.message.tool_calls = [tc]
+        resp = MagicMock()
+        resp.choices = [choice]
+        return resp
+
+    def test_sends_required_tool_choice(self):
+        mock_openai = MagicMock()
+        good_response = self._make_tool_call_response(
+            '{"clusters": [], "clustering_type": "trivial", "note": null, "coverage": null}'
+        )
+        with patch.dict("sys.modules", {"openai": _make_openai_module(mock_openai)}):
+            client = mock_openai.return_value
+            client.chat.completions.create.return_value = good_response
+            provider = _OpenAIProvider("sk-test")
+            provider.call(
+                model="gpt-4o",
+                system_prompt="sys",
+                user_message="user",
+                tool_schema={},
+            )
+            call_kwargs = client.chat.completions.create.call_args[1]
+            assert call_kwargs["tool_choice"] == "required"
+
+    def test_required_works_for_gateway_models(self):
+        mock_openai = MagicMock()
+        good_response = self._make_tool_call_response(
+            '{"clusters": [], "clustering_type": "trivial", "note": null, "coverage": null}'
+        )
+        with patch.dict("sys.modules", {"openai": _make_openai_module(mock_openai)}):
+            client = mock_openai.return_value
+            client.chat.completions.create.return_value = good_response
+            provider = _OpenAIProvider("sk-test", base_url="https://litellm.example.com")
+            provider.call(
+                model="openai/gpt-5-codex",
+                system_prompt="sys",
+                user_message="user",
+                tool_schema={},
+            )
+            call_kwargs = client.chat.completions.create.call_args[1]
+            assert call_kwargs["tool_choice"] == "required"

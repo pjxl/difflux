@@ -88,7 +88,10 @@ class _OpenAIProvider:
                 {"role": "user", "content": user_message},
             ],
             tools=[tool_def],
-            tool_choice={"type": "function", "function": {"name": "return_clustering"}},
+            # "required" is a plain string: avoids the Chat Completions vs Responses API
+            # tool_choice object format mismatch on newer models (e.g. gpt-5-codex via
+            # LiteLLM). Since we define exactly one tool, "required" always calls it.
+            tool_choice="required",
         )
         for choice in response.choices:
             if choice.message.tool_calls:
