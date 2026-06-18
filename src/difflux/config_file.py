@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -48,9 +49,6 @@ def save_api_key(provider: str, key: str, label: str = "") -> None:
     if env_var is None:
         raise ValueError(f"Unknown provider: {provider!r}")
 
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    CONFIG_DIR.chmod(0o700)
-
     data = load_config_file()
     data.setdefault("keys", {})[provider] = {"key": key, "label": label}
     _write_config(data)
@@ -86,9 +84,6 @@ def save_defaults(
     model: str | None = None,
 ) -> None:
     """Merge non-None defaults into [defaults] in config.toml and inject into os.environ."""
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    CONFIG_DIR.chmod(0o700)
-
     data = load_config_file()
     defaults = data.setdefault("defaults", {})
 
@@ -120,6 +115,9 @@ def _toml_escape(value: str) -> str:
 
 
 def _write_config(data: dict) -> None:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    CONFIG_DIR.chmod(0o700)
+
     lines: list[str] = []
 
     # A top-level [defaults] table must be emitted before any [keys.*] tables:
@@ -137,5 +135,12 @@ def _write_config(data: dict) -> None:
         lines.append(f'key = "{_toml_escape(entry.get("key", ""))}"\n')
         lines.append(f'label = "{_toml_escape(entry.get("label", ""))}"\n')
         lines.append("\n")
-    CONFIG_FILE.write_text("".join(lines))
-    CONFIG_FILE.chmod(0o600)
+
+    content = "".join(lines).encode()
+    fd, tmp = tempfile.mkstemp(dir=CONFIG_DIR, prefix=".config_", suffix=".toml.tmp")
+    try:
+        os.fchmod(fd, 0o600)
+        os.write(fd, content)
+    finally:
+        os.close(fd)
+    Path(tmp).replace(CONFIG_FILE)
