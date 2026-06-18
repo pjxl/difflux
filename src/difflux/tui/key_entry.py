@@ -6,6 +6,8 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Input, Static
 
+from difflux.tui._shared import _DIALOG_CSS
+
 _PROVIDERS = ["anthropic", "openai"]
 
 _META: dict[str, dict[str, str]] = {
@@ -20,14 +22,6 @@ _META: dict[str, dict[str, str]] = {
         "placeholder": "sk-...",
     },
 }
-
-_DIALOG_CSS = """
-width: 70;
-height: auto;
-border: solid $accent;
-background: $surface;
-padding: 1 2;
-"""
 
 
 class KeyEntryApp(App[str | None]):

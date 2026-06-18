@@ -11,6 +11,8 @@ from textual.widgets.option_list import Option
 from textual.worker import Worker, WorkerState
 
 from difflux import clusterer
+from difflux.clusterer import _is_o_series
+from difflux.tui._shared import _DIALOG_CSS
 
 # Sensible default model for a Direct OpenAI / gateway setup.
 _OPENAI_DEFAULT_MODEL = "gpt-4o"
@@ -35,21 +37,6 @@ _OPENAI_BLOCKLIST = (
     "image",
     "transcribe",
 )
-
-_DIALOG_CSS = """
-width: 70;
-height: auto;
-border: solid $accent;
-background: $surface;
-padding: 1 2;
-"""
-
-
-def _is_o_series(model_id: str) -> bool:
-    """True for OpenAI o-series ids (o1, o3-mini, o4, …)."""
-    if len(model_id) < 2 or model_id[0] != "o" or not model_id[1].isdigit():
-        return False
-    return True
 
 
 def _rank_models(provider: str, ids: list[str], *, base_url: str | None = None) -> list[str]:
