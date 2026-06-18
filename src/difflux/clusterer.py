@@ -27,6 +27,8 @@ class _Provider(Protocol):
         tool_schema: dict,
     ) -> dict: ...
 
+    def list_models(self) -> list[str]: ...
+
 
 class _AnthropicProvider:
     def __init__(self, api_key: str | None, base_url: str | None = None) -> None:
@@ -50,6 +52,9 @@ class _AnthropicProvider:
             if block.type == "tool_use" and block.name == "return_clustering":
                 return block.input  # already a dict
         raise ClusteringError("LLM did not call return_clustering — check model and API key")
+
+    def list_models(self) -> list[str]:
+        return [m.id for m in self._client.models.list(limit=1000)]
 
 
 def _is_o_series(model: str) -> bool:
@@ -92,6 +97,9 @@ class _OpenAIProvider:
                         return json.loads(tc.function.arguments)
         raise ClusteringError("LLM did not call return_clustering — check model and API key")
 
+    def list_models(self) -> list[str]:
+        return [m.id for m in self._client.models.list()]
+
 
 def detect_provider(model: str) -> str:
     if model.startswith("claude"):
@@ -109,6 +117,11 @@ def _make_provider(name: str, api_key: str | None, base_url: str | None = None) 
     if name == "openai":
         return _OpenAIProvider(api_key, base_url)
     raise ClusteringError(f"Unknown provider '{name}'. Choose 'anthropic' or 'openai'.")
+
+
+def list_models(provider: str, *, api_key: str | None, base_url: str | None = None) -> list[str]:
+    p = _make_provider(provider, api_key, base_url)
+    return p.list_models()
 
 
 def _truncate_hunks(hunks: list[Hunk]) -> list[Hunk]:
