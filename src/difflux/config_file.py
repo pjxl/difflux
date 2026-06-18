@@ -12,6 +12,12 @@ _ENV_VAR: dict[str, str] = {
     "openai": "OPENAI_API_KEY",
 }
 
+_DEFAULTS_ENV_VAR: dict[str, str] = {
+    "provider": "DIFFLUX_PROVIDER",
+    "base_url": "DIFFLUX_BASE_URL",
+    "model": "DIFFLUX_MODEL",
+}
+
 
 def load_config_file() -> dict:
     if not CONFIG_FILE.exists():
@@ -28,6 +34,12 @@ def bootstrap_config() -> None:
         key = entry.get("key", "")
         if key and env_var not in os.environ:
             os.environ[env_var] = key
+
+    defaults = data.get("defaults", {})
+    for field, env_var in _DEFAULTS_ENV_VAR.items():
+        value = defaults.get(field, "")
+        if value and env_var not in os.environ:
+            os.environ[env_var] = value
 
 
 def save_api_key(provider: str, key: str, label: str = "") -> None:
@@ -61,6 +73,34 @@ def get_wallet() -> dict[str, dict[str, str]]:
     return load_config_file().get("keys", {})
 
 
+def save_defaults(
+    *,
+    provider: str | None = None,
+    base_url: str | None = None,
+    model: str | None = None,
+) -> None:
+    """Merge non-None defaults into [defaults] in config.toml and inject into os.environ."""
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    CONFIG_DIR.chmod(0o700)
+
+    data = load_config_file()
+    defaults = data.setdefault("defaults", {})
+
+    updates = {"provider": provider, "base_url": base_url, "model": model}
+    for field, value in updates.items():
+        if value is None:
+            continue
+        defaults[field] = value
+        os.environ[_DEFAULTS_ENV_VAR[field]] = value
+
+    _write_config(data)
+
+
+def load_defaults() -> dict:
+    """Return the [defaults] table as a dict (subset of provider/base_url/model)."""
+    return load_config_file().get("defaults", {})
+
+
 def _toml_escape(value: str) -> str:
     """Escape a string for safe inclusion in a TOML basic string."""
     return (
@@ -75,6 +115,17 @@ def _toml_escape(value: str) -> str:
 
 def _write_config(data: dict) -> None:
     lines: list[str] = []
+
+    # A top-level [defaults] table must be emitted before any [keys.*] tables:
+    # TOML top-level keys belong to the most recently declared table header.
+    defaults = data.get("defaults", {})
+    if defaults:
+        lines.append("[defaults]\n")
+        for field in ("provider", "base_url", "model"):
+            if field in defaults:
+                lines.append(f'{field} = "{_toml_escape(defaults[field])}"\n')
+        lines.append("\n")
+
     for provider, entry in data.get("keys", {}).items():
         lines.append(f"[keys.{provider}]\n")
         lines.append(f'key = "{_toml_escape(entry.get("key", ""))}"\n')
