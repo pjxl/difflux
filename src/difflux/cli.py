@@ -104,6 +104,19 @@ def main() -> None:
         print(f"difflux: {e}", file=sys.stderr)
         sys.exit(1)
 
+    # After reading a piped diff, stdin (FD 0) is at EOF. Textual's Linux
+    # driver reads from sys.__stdin__.fileno() (always FD 0) — reassigning
+    # sys.stdin has no effect. Use dup2 to redirect FD 0 to /dev/tty so
+    # Textual sees a live keyboard device.
+    if not sys.__stdin__.isatty():
+        try:
+            import os as _os
+            _tty = open("/dev/tty")
+            _os.dup2(_tty.fileno(), sys.__stdin__.fileno())
+            _tty.close()
+        except OSError:
+            pass
+
     hunks = parse_diff(diff_text)
     if not hunks:
         print("difflux: diff is empty — nothing to cluster.", file=sys.stderr)
