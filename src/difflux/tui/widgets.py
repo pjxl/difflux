@@ -42,6 +42,9 @@ class ClusterCard(Static):
 
     def toggle_reviewed(self) -> None:
         self._view.reviewed = not self._view.reviewed
+        self.sync_reviewed()
+
+    def sync_reviewed(self) -> None:
         if self._view.reviewed:
             self.add_class("reviewed")
         else:

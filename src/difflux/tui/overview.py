@@ -101,9 +101,13 @@ class OverviewScreen(Screen):
         cards = list(self.query(ClusterCard))
         if not cards:
             return
-        view = self.session.clusters[self._focused_index]
+        index = self._focused_index
+        view = self.session.clusters[index]
         from difflux.tui.drilldown import DrillDownScreen
-        self.app.push_screen(DrillDownScreen(view))
+        self.app.push_screen(
+            DrillDownScreen(view),
+            lambda reviewed: cards[index].sync_reviewed() if reviewed else None,
+        )
 
     def action_toggle_reviewed(self) -> None:
         cards = list(self.query(ClusterCard))

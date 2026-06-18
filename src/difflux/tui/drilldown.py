@@ -34,11 +34,11 @@ class DrillDownScreen(Screen):
         yield Footer()
 
     def action_go_back(self) -> None:
-        self.app.pop_screen()
+        self.dismiss(False)
 
     def action_toggle_reviewed(self) -> None:
         self._view.reviewed = not self._view.reviewed
-        self.app.pop_screen()
+        self.dismiss(True)
 
 
 class SingleIdeaScreen(Screen):
