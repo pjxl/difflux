@@ -46,29 +46,6 @@ pip install difflux
 
 Requires Python 3.11+.
 
-## Setup
-
-`difflux` defaults to an Anthropic model, so set your Anthropic API key:
-
-```sh
-export ANTHROPIC_API_KEY=sk-ant-...
-```
-
-Prefer OpenAI? Set an OpenAI key instead and pick an OpenAI model:
-
-```sh
-export OPENAI_API_KEY=sk-...
-difflux --model gpt-4o
-```
-
-See the [Configuration](#configuration) table for all variables and how the provider is selected.
-
-For private GitHub repositories, also set:
-
-```sh
-export GITHUB_TOKEN=ghp_...
-```
-
 ## Usage
 
 Pipe a diff from stdin (primary mode):
@@ -84,10 +61,19 @@ Pass a GitHub PR URL directly:
 difflux https://github.com/owner/repo/pull/123
 ```
 
+For private repositories, set `GITHUB_TOKEN=ghp_...` or difflux will receive a 404.
+
 For plain-text output instead of the TUI:
 
 ```sh
 git diff HEAD~1 | difflux --no-tui
+```
+
+On first run, difflux will prompt for your API key and save it. To pre-set it instead (useful for scripts or CI):
+
+```sh
+export ANTHROPIC_API_KEY=sk-ant-...  # Anthropic (default)
+export OPENAI_API_KEY=sk-...         # OpenAI — also pass --model gpt-4o
 ```
 
 ## Keybindings
@@ -117,3 +103,12 @@ git diff HEAD~1 | difflux --no-tui
 | `DIFFLUX_PROVIDER` | No | `anthropic` or `openai`; auto-detected from model name |
 
 \* One of `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is required depending on the model.
+
+## Development
+
+```sh
+make setup   # install Python 3.11, pipx, and wire difflux onto PATH
+make test    # run the test suite
+```
+
+After setup, run `difflux` directly — no venv activation needed.
