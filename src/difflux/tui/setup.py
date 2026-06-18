@@ -203,10 +203,19 @@ class SetupWizardApp(App[SetupResult | None]):
             event.stop()
             return
 
-        # j/k move within the OptionList when it (not the filter Input) is
-        # focused, mirroring the choice-step idiom.
-        if self.focused is option_list and event.key in ("j", "k"):
-            option_list.action_cursor_down() if event.key == "j" else option_list.action_cursor_up()
+        # The filter Input keeps focus so the user can type to narrow, so drive
+        # the OptionList's cursor from here. Up/Down/PageUp/PageDown aren't used
+        # by Input, so they bubble up to us; forwarding them moves the highlight
+        # and scrolls it into view. (j/k can't navigate — they're filter text.)
+        nav = {
+            "down": option_list.action_cursor_down,
+            "up": option_list.action_cursor_up,
+            "pagedown": option_list.action_page_down,
+            "pageup": option_list.action_page_up,
+        }
+        action = nav.get(event.key)
+        if action is not None:
+            action()
             event.stop()
 
     async def _select_choice(self, choice: str) -> None:
@@ -333,6 +342,10 @@ class SetupWizardApp(App[SetupResult | None]):
                 continue
             seen.add(model_id)
             option_list.add_option(Option(model_id, id=model_id))
+        # Give the list a starting highlight so ↑/↓ have an anchor and Enter has
+        # something to select, even though focus stays on the filter Input.
+        if option_list.option_count:
+            option_list.highlighted = 0
 
     async def _swap_to_models(self, models: list[str]) -> None:
         self._all_models = _dedupe(models)
@@ -347,7 +360,7 @@ class SetupWizardApp(App[SetupResult | None]):
             Input(placeholder="filter… (Enter on no match uses it as-is)", id="model-filter"),
             OptionList(id="model-list"),
             Static(
-                "[dim]↑/↓ or j/k  move · Enter  select · Tab  show all · Esc  cancel[/dim]",
+                "[dim]↑/↓  move · Enter  select · Tab  show all · Esc  cancel[/dim]",
                 markup=True,
                 id="tip",
             ),
@@ -427,12 +440,14 @@ class SetupWizardApp(App[SetupResult | None]):
             self._key = value
             await self._enter_model_step()
         elif event.input.id == "model-filter":
-            # Free-text fallback: if the typed value isn't an exact id in the
-            # current set, accept it verbatim (advisory). Otherwise fall through
-            # to letting the user pick from the narrowed OptionList via Enter.
-            if not value:
-                return
-            self._finish(value)
+            option_list = self.query_one("#model-list", OptionList)
+            # Enter selects the highlighted option when the list has matches;
+            # otherwise accept the typed text verbatim (free-text fallback).
+            if option_list.option_count and option_list.highlighted is not None:
+                opt = option_list.get_option_at_index(option_list.highlighted)
+                self._finish(opt.id or str(opt.prompt))
+            elif value:
+                self._finish(value)
         elif event.input.id == "model-input":
             # Manual fallback path (listing unavailable).
             if not value:

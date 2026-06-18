@@ -256,6 +256,33 @@ class TestWizardFlow:
         assert result is not None
         assert result.model == "gpt-4o"
 
+    def test_arrow_keys_navigate_and_enter_selects(self):
+        """↑/↓ drive the OptionList from the (focused) filter box, and Enter on
+        the filter selects the highlighted option (regression: j/k typed into the
+        filter and the list wasn't navigable)."""
+        async def drive():
+            fake = ["claude-3-5-haiku", "claude-opus-4-8", "claude-3-5-sonnet"]
+            with patch("difflux.clusterer.list_models", return_value=fake, create=True):
+                app = SetupWizardApp(default_anthropic_model="claude-opus-4-8")
+                async with app.run_test() as pilot:
+                    await pilot.press("enter")  # Direct Anthropic
+                    app.query_one("#key-input").value = "sk-ant-xyz"
+                    await pilot.press("enter")
+                    await self._settle_picker(app, pilot)
+                    option_list = app.query_one("#model-list")
+                    assert option_list.highlighted == 0  # starting anchor
+                    ranked = [o.id for o in option_list.options]
+                    await pilot.press("down")  # move highlight down by one
+                    await pilot.pause()
+                    assert option_list.highlighted == 1
+                    await pilot.press("enter")  # Enter on the filter selects it
+                    await pilot.pause()
+                return app.return_value, ranked
+
+        result, ranked = self._run(drive())
+        assert result is not None
+        assert result.model == ranked[1]
+
     def test_free_text_fallback_when_list_models_raises(self):
         async def drive():
             with patch(
