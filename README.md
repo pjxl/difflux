@@ -136,4 +136,6 @@ make setup   # install Python 3.11, pipx, and wire difflux onto PATH
 make test    # run the test suite
 ```
 
-After setup, run `difflux` directly — no venv activation needed.
+`make setup` installs `difflux` as an editable install from this checkout, so source edits take effect immediately and you can run `difflux` directly — no venv activation needed. Because it's editable, don't move or delete the repo afterward, or the `difflux` command will break.
+
+`make test` is independent: it builds its own `.venv` (with the `dev` extras) and runs the suite there, so it doesn't touch the pipx-installed CLI.

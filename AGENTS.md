@@ -26,6 +26,11 @@ cp .env.example .env   # fill in ANTHROPIC_API_KEY
 The entry point is registered as `difflux = "difflux.cli:main"` in `pyproject.toml`.
 `python -m difflux` also works via `src/difflux/__main__.py`.
 
+This `.venv` is the development/test environment (it carries the `dev` extras and is
+what `make test` uses). It's separate from `make setup`, which installs the `difflux`
+*command* as an editable pipx app from this same checkout — both point at `src/`, so
+source edits are live either way.
+
 ---
 
 ## Running tests
