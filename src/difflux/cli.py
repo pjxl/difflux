@@ -122,8 +122,6 @@ def main() -> None:
         print("difflux: diff is empty — nothing to cluster.", file=sys.stderr)
         sys.exit(0)
 
-    _ensure_api_key(provider, model, no_tui=args.no_tui)
-
     from difflux.clusterer import cluster
 
     def run_clustering():
@@ -131,23 +129,33 @@ def main() -> None:
         index = HunkIndex(hunks)
         return build_session(result, index)
 
-    try:
-        session = run_clustering()
-    except ClusteringError as e:
-        print(f"difflux: {e}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        msg = str(e).lower()
-        if "401" in msg or "authentication" in msg or "api_key" in msg:
-            print("difflux: your API key was rejected — check it at the provider console.", file=sys.stderr)
-        elif "403" in msg or "permission" in msg or "not found" in msg:
-            print(
-                f"difflux: your account may not have access to model '{model}' — try a different model.",
-                file=sys.stderr,
-            )
-        else:
+    env_var = "ANTHROPIC_API_KEY" if provider == "anthropic" else "OPENAI_API_KEY"
+
+    while True:
+        _ensure_api_key(provider, model, no_tui=args.no_tui)
+        try:
+            session = run_clustering()
+            break
+        except ClusteringError as e:
             print(f"difflux: {e}", file=sys.stderr)
-        sys.exit(1)
+            sys.exit(1)
+        except Exception as e:
+            msg = str(e).lower()
+            if "401" in msg or "authentication" in msg or "api_key" in msg:
+                from difflux.config_file import delete_api_key
+                delete_api_key(provider)
+                os.environ.pop(env_var, None)
+                print("difflux: API key rejected — please enter a valid key.", file=sys.stderr)
+                # Loop back to re-prompt; _ensure_api_key will show the modal again.
+            elif "403" in msg or "permission" in msg or "not found" in msg:
+                print(
+                    f"difflux: your account may not have access to model '{model}' — try a different model.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            else:
+                print(f"difflux: {e}", file=sys.stderr)
+                sys.exit(1)
 
     use_tui = not args.no_tui and sys.stdout.isatty()
 
