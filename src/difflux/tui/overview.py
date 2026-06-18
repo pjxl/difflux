@@ -23,6 +23,7 @@ class OverviewScreen(Screen):
         ("enter", "drill_in", "Expand"),
         ("space", "toggle_reviewed", "Mark reviewed"),
         ("r", "regen", "Regenerate (same model)"),
+        ("K", "manage_keys", "API Keys"),
         ("question_mark", "help", "Help"),
         ("q,escape", "quit_app", "Quit"),
     ]
@@ -37,12 +38,14 @@ class OverviewScreen(Screen):
         session: ReviewSession,
         regenerate: Callable[[], ReviewSession],
         model: str,
+        provider: str,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.session = session
         self._regenerate = regenerate
         self.model = model
+        self._provider = provider
         self._focused_index = 0
         self._help_visible = False
 
@@ -118,6 +121,13 @@ class OverviewScreen(Screen):
         else:
             self.mount(HelpModal())
             self._help_visible = True
+
+    def action_manage_keys(self) -> None:
+        from difflux.tui.key_entry import WalletModal
+        self.app.push_screen(WalletModal(self._provider), self._on_wallet_closed)
+
+    def _on_wallet_closed(self, _: None) -> None:
+        pass
 
     def action_regen(self) -> None:
         self.mount(LoadingIndicator())

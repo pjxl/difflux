@@ -42,12 +42,14 @@ class DiffluxApp(App):
         session: ReviewSession,
         regenerate: Callable[[], ReviewSession],
         model: str,
+        provider: str,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.session = session
         self._regenerate = regenerate
         self.model = model
+        self.provider = provider
 
     def on_mount(self) -> None:
         from difflux.tui.overview import OverviewScreen
@@ -56,4 +58,4 @@ class DiffluxApp(App):
         if self.session.clustering_type == ClusteringType.SINGLE_IDEA:
             self.push_screen(SingleIdeaScreen(self.session))
         else:
-            self.push_screen(OverviewScreen(self.session, self._regenerate, self.model))
+            self.push_screen(OverviewScreen(self.session, self._regenerate, self.model, self.provider))

@@ -1,15 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
-from difflux.config import (
-    ANTHROPIC_API_KEY,
-    DEFAULT_MODEL,
-    DIFFLUX_PROVIDER,
-    GITHUB_TOKEN,
-    OPENAI_API_KEY,
-)
+from difflux.config import DEFAULT_MODEL, DIFFLUX_PROVIDER, GITHUB_TOKEN
 from difflux.clusterer import ClusteringError, detect_provider
 from difflux.hunks import HunkIndex, parse_diff
 from difflux.enrich import build_session
@@ -56,56 +51,65 @@ def _resolve_diff(source: str | None) -> str:
     sys.exit(1)
 
 
-def _check_api_key(provider: str | None, model: str) -> None:
-    if provider is None:
+def _resolve_provider(provider_arg: str | None, model: str) -> str:
+    """Return the concrete provider string, detecting from model name if needed."""
+    if provider_arg:
+        return provider_arg
+    try:
+        return detect_provider(model)
+    except ClusteringError as e:
+        print(f"difflux: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _ensure_api_key(provider: str, model: str, *, no_tui: bool) -> None:
+    """Guarantee the API key for provider is in os.environ. Prompts if missing."""
+    env_var = "ANTHROPIC_API_KEY" if provider == "anthropic" else "OPENAI_API_KEY"
+    if os.environ.get(env_var):
+        return
+
+    use_tui = not no_tui and sys.stdout.isatty()
+
+    if use_tui:
+        from difflux.tui.key_entry import KeyEntryApp
+        key = KeyEntryApp(provider).run()
+    else:
+        import getpass
+        provider_label = "Anthropic" if provider == "anthropic" else "OpenAI"
+        url = "https://console.anthropic.com/" if provider == "anthropic" else "https://platform.openai.com/"
+        print(f"difflux: {provider_label} API key required (get one at {url})", file=sys.stderr)
         try:
-            provider = detect_provider(model)
-        except ClusteringError as e:
-            print(f"difflux: {e}", file=sys.stderr)
-            sys.exit(1)
+            key = getpass.getpass(f"{env_var}: ")
+        except (KeyboardInterrupt, EOFError):
+            key = None
 
-    if provider == "anthropic" and not ANTHROPIC_API_KEY:
-        print(
-            f"difflux: model '{model}' requires ANTHROPIC_API_KEY, which is not set.",
-            file=sys.stderr,
-        )
-        print(
-            "  export ANTHROPIC_API_KEY=sk-ant-...  (get a key at https://console.anthropic.com/)",
-            file=sys.stderr,
-        )
-        print("  Or use an OpenAI model: difflux --model gpt-4o", file=sys.stderr)
+    key = (key or "").strip()
+    if not key:
+        print("difflux: no API key provided, exiting.", file=sys.stderr)
         sys.exit(1)
 
-    if provider == "openai" and not OPENAI_API_KEY:
-        print(
-            f"difflux: model '{model}' requires OPENAI_API_KEY, which is not set.",
-            file=sys.stderr,
-        )
-        print(
-            "  export OPENAI_API_KEY=sk-...  (get a key at https://platform.openai.com/)",
-            file=sys.stderr,
-        )
-        print("  Or use an Anthropic model: difflux --model claude-opus-4-8", file=sys.stderr)
-        sys.exit(1)
+    from difflux.config_file import save_api_key
+    save_api_key(provider, key)
 
 
 def main() -> None:
     args = _make_arg_parser().parse_args()
     model = args.model or DEFAULT_MODEL
-    provider = args.provider or DIFFLUX_PROVIDER or None
+    provider = _resolve_provider(args.provider or DIFFLUX_PROVIDER or None, model)
 
-    _check_api_key(provider, model)
-
+    # Consume stdin before any TUI launch
     try:
         diff_text = _resolve_diff(args.source)
     except RuntimeError as e:
         print(f"difflux: {e}", file=sys.stderr)
         sys.exit(1)
-    hunks = parse_diff(diff_text)
 
+    hunks = parse_diff(diff_text)
     if not hunks:
         print("difflux: diff is empty — nothing to cluster.", file=sys.stderr)
         sys.exit(0)
+
+    _ensure_api_key(provider, model, no_tui=args.no_tui)
 
     from difflux.clusterer import cluster
 
@@ -136,7 +140,7 @@ def main() -> None:
 
     if use_tui:
         from difflux.tui.app import DiffluxApp
-        app = DiffluxApp(session=session, regenerate=run_clustering, model=model)
+        app = DiffluxApp(session=session, regenerate=run_clustering, model=model, provider=provider)
         app.run()
         n_reviewed = sum(1 for v in session.clusters if v.reviewed)
         print(f"Reviewed {n_reviewed} clusters, {session.total_files} files with {model}")
