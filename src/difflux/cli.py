@@ -4,7 +4,7 @@ import argparse
 import os
 import sys
 
-from difflux.config import DEFAULT_MODEL, DIFFLUX_PROVIDER, GITHUB_TOKEN
+from difflux.config import DEFAULT_MODEL, DIFFLUX_BASE_URL, DIFFLUX_PROVIDER, GITHUB_TOKEN
 from difflux.clusterer import ClusteringError, detect_provider
 from difflux.hunks import HunkIndex, parse_diff
 from difflux.enrich import build_session
@@ -29,6 +29,12 @@ def _make_arg_parser() -> argparse.ArgumentParser:
         choices=["anthropic", "openai"],
         help="LLM provider. Auto-detected from model name if omitted. "
              "Also set via DIFFLUX_PROVIDER env var.",
+    )
+    p.add_argument(
+        "--base-url",
+        default=None,
+        help="Custom API base URL for an OpenAI/Anthropic-compatible gateway (e.g. LiteLLM). "
+             "Also set via DIFFLUX_BASE_URL env var.",
     )
     p.add_argument("--no-tui", action="store_true", help="Print plain text instead of launching the TUI.")
     return p
@@ -62,22 +68,26 @@ def _resolve_provider(provider_arg: str | None, model: str) -> str:
         sys.exit(1)
 
 
-def _ensure_api_key(provider: str, model: str, *, no_tui: bool) -> None:
+def _ensure_api_key(provider: str, model: str, *, no_tui: bool, base_url: str | None = None) -> None:
     """Guarantee the API key for provider is in os.environ. Prompts if missing."""
     env_var = "ANTHROPIC_API_KEY" if provider == "anthropic" else "OPENAI_API_KEY"
     if os.environ.get(env_var):
         return
 
     use_tui = not no_tui and sys.stdout.isatty()
+    custom_base_url = bool(base_url)
 
     if use_tui:
         from difflux.tui.key_entry import KeyEntryApp
-        key = KeyEntryApp(provider).run()
+        key = KeyEntryApp(provider, custom_base_url=custom_base_url).run()
     else:
         import getpass
-        provider_label = "Anthropic" if provider == "anthropic" else "OpenAI"
-        url = "https://console.anthropic.com/" if provider == "anthropic" else "https://platform.openai.com/"
-        print(f"difflux: {provider_label} API key required (get one at {url})", file=sys.stderr)
+        if custom_base_url:
+            print(f"difflux: API key required for {base_url}", file=sys.stderr)
+        else:
+            provider_label = "Anthropic" if provider == "anthropic" else "OpenAI"
+            url = "https://console.anthropic.com/" if provider == "anthropic" else "https://platform.openai.com/"
+            print(f"difflux: {provider_label} API key required (get one at {url})", file=sys.stderr)
         try:
             key = getpass.getpass(f"{env_var}: ")
         except (KeyboardInterrupt, EOFError):
@@ -96,6 +106,7 @@ def main() -> None:
     args = _make_arg_parser().parse_args()
     model = args.model or DEFAULT_MODEL
     provider = _resolve_provider(args.provider or DIFFLUX_PROVIDER or None, model)
+    base_url = args.base_url or DIFFLUX_BASE_URL or None
 
     # Consume stdin before any TUI launch
     try:
@@ -125,14 +136,14 @@ def main() -> None:
     from difflux.clusterer import cluster
 
     def run_clustering():
-        result = cluster(hunks, model=model, provider=provider)
+        result = cluster(hunks, model=model, provider=provider, base_url=base_url)
         index = HunkIndex(hunks)
         return build_session(result, index)
 
     env_var = "ANTHROPIC_API_KEY" if provider == "anthropic" else "OPENAI_API_KEY"
 
     while True:
-        _ensure_api_key(provider, model, no_tui=args.no_tui)
+        _ensure_api_key(provider, model, no_tui=args.no_tui, base_url=base_url)
         try:
             session = run_clustering()
             break

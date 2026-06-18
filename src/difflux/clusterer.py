@@ -29,8 +29,8 @@ class _Provider(Protocol):
 
 
 class _AnthropicProvider:
-    def __init__(self, api_key: str | None) -> None:
-        self._client = anthropic.Anthropic(api_key=api_key or None)
+    def __init__(self, api_key: str | None, base_url: str | None = None) -> None:
+        self._client = anthropic.Anthropic(api_key=api_key or None, base_url=base_url or None)
 
     def call(self, *, model: str, system_prompt: str, user_message: str, tool_schema: dict) -> dict:
         tool_def = {
@@ -57,14 +57,12 @@ def _is_o_series(model: str) -> bool:
 
 
 class _OpenAIProvider:
-    def __init__(self, api_key: str | None) -> None:
+    def __init__(self, api_key: str | None, base_url: str | None = None) -> None:
         try:
             from openai import OpenAI  # noqa: PLC0415
-            self._client = OpenAI(api_key=api_key or None)
+            self._client = OpenAI(api_key=api_key or None, base_url=base_url or None)
         except ImportError:
-            raise ClusteringError(
-                "openai package is not installed. Run: pip install 'difflux[openai]'"
-            ) from None
+            raise ClusteringError("openai package is not installed.") from None
 
     def call(self, *, model: str, system_prompt: str, user_message: str, tool_schema: dict) -> dict:
         tool_def = {
@@ -105,11 +103,11 @@ def detect_provider(model: str) -> str:
     )
 
 
-def _make_provider(name: str, api_key: str | None) -> _Provider:
+def _make_provider(name: str, api_key: str | None, base_url: str | None = None) -> _Provider:
     if name == "anthropic":
-        return _AnthropicProvider(api_key)
+        return _AnthropicProvider(api_key, base_url)
     if name == "openai":
-        return _OpenAIProvider(api_key)
+        return _OpenAIProvider(api_key, base_url)
     raise ClusteringError(f"Unknown provider '{name}'. Choose 'anthropic' or 'openai'.")
 
 
@@ -146,11 +144,12 @@ def cluster(
     api_key: str | None = None,
     correction_hint: str | None = None,
     provider: str | None = None,
+    base_url: str | None = None,
 ) -> ClusteringResult:
     hunks = _truncate_hunks(list(hunks))
 
     provider_name = provider or detect_provider(model)
-    p = _make_provider(provider_name, api_key)
+    p = _make_provider(provider_name, api_key, base_url)
 
     raw = p.call(
         model=model,

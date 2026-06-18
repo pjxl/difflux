@@ -101,8 +101,31 @@ export OPENAI_API_KEY=sk-...         # OpenAI — also pass --model gpt-4o
 | `GITHUB_TOKEN` | No | GitHub personal access token for private repos |
 | `DIFFLUX_MODEL` | No | Model to use (default: `claude-opus-4-8`) |
 | `DIFFLUX_PROVIDER` | No | `anthropic` or `openai`; auto-detected from model name |
+| `DIFFLUX_BASE_URL` | No | Custom API base URL for an OpenAI/Anthropic-compatible gateway (also `--base-url`) |
 
 \* One of `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is required depending on the model.
+
+### Using a custom gateway (e.g. LiteLLM)
+
+`DIFFLUX_BASE_URL` (or `--base-url`) points difflux at any OpenAI- or
+Anthropic-compatible gateway instead of the vendor's default endpoint. The key you
+enter on first run is sent to that gateway.
+
+#### At Etsy (LiteLLM)
+
+Etsy developers don't use direct vendor API keys — route difflux through the LiteLLM
+gateway, which is OpenAI-compatible:
+
+```sh
+export DIFFLUX_PROVIDER=openai
+export DIFFLUX_BASE_URL=<litellm-gateway-url>   # confirm in #gen-ai-help
+export DIFFLUX_MODEL=<model-exposed-by-litellm>
+export OPENAI_API_KEY=<your-litellm-key>        # from go/litellmkey, or enter on first run
+```
+
+Set `DIFFLUX_PROVIDER=openai` even when the underlying model is Claude — LiteLLM speaks
+the OpenAI API. Confirm the gateway URL and available model names in `#gen-ai-help`
+(LiteLLM keys are minted via `go/litellmkey`).
 
 ## Development
 

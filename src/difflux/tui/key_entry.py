@@ -42,16 +42,22 @@ class KeyEntryApp(App[str | None]):
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
 
-    def __init__(self, provider: str, **kwargs) -> None:
+    def __init__(self, provider: str, custom_base_url: bool = False, **kwargs) -> None:
         super().__init__(**kwargs)
         self._provider = provider
+        self._custom_base_url = custom_base_url
 
     def compose(self) -> ComposeResult:
         meta = _META[self._provider]
         with Vertical(id="d"):
-            yield Static(f"[bold]difflux — {meta['label']} API Key Required[/bold]", markup=True)
-            yield Static(f"Get your key at {meta['url']}", id="hint")
-            yield Input(placeholder=meta["placeholder"], password=True, id="key-input")
+            if self._custom_base_url:
+                yield Static("[bold]difflux — API Key Required[/bold]", markup=True)
+                yield Static("Get your key from your provider or gateway admin", id="hint")
+                yield Input(placeholder="API key", password=True, id="key-input")
+            else:
+                yield Static(f"[bold]difflux — {meta['label']} API Key Required[/bold]", markup=True)
+                yield Static(f"Get your key at {meta['url']}", id="hint")
+                yield Input(placeholder=meta["placeholder"], password=True, id="key-input")
             yield Static("[dim]Enter  save · Esc  quit without saving[/dim]", markup=True, id="tip")
 
     def on_mount(self) -> None:
