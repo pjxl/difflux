@@ -22,7 +22,7 @@ class OverviewScreen(Screen):
         ("k,up", "move_up", "Up"),
         ("enter", "drill_in", "Expand"),
         ("space", "toggle_reviewed", "Mark reviewed"),
-        ("r", "regen", "Regenerate"),
+        ("r", "regen", "Regenerate (same model)"),
         ("question_mark", "help", "Help"),
         ("q,escape", "quit_app", "Quit"),
     ]
@@ -36,11 +36,13 @@ class OverviewScreen(Screen):
         self,
         session: ReviewSession,
         regenerate: Callable[[], ReviewSession],
+        model: str,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.session = session
         self._regenerate = regenerate
+        self.model = model
         self._focused_index = 0
         self._help_visible = False
 
@@ -59,7 +61,7 @@ class OverviewScreen(Screen):
         s = self.session
         header = self.query_one("#overview-header", Static)
         header.update(
-            f"[bold]difflux[/bold]  ·  {len(s.clusters)} clusters  ·  {s.total_files} files",
+            f"[bold]difflux[/bold]  ·  {self.model}  ·  {len(s.clusters)} clusters  ·  {s.total_files} files",
         )
         rule = "─" * 58
         self.query_one("#rule-top", Static).update(rule)

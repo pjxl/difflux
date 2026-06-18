@@ -3,8 +3,8 @@ from __future__ import annotations
 from difflux.enrich import ClusterView, ReviewSession
 
 
-def render_overview(session: ReviewSession) -> str:
-    lines = [f"difflux · {len(session.clusters)} clusters · {session.total_files} files\n"]
+def render_overview(session: ReviewSession, model: str) -> str:
+    lines = [f"difflux · {model} · {len(session.clusters)} clusters · {session.total_files} files\n"]
     for i, v in enumerate(session.clusters, 1):
         mark = "✓" if v.reviewed else " "
         lines.append(

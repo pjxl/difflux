@@ -48,11 +48,20 @@ Requires Python 3.11+.
 
 ## Setup
 
-Set your Anthropic API key:
+`difflux` defaults to an Anthropic model, so set your Anthropic API key:
 
 ```sh
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
+
+Prefer OpenAI? Set an OpenAI key instead and pick an OpenAI model:
+
+```sh
+export OPENAI_API_KEY=sk-...
+difflux --model gpt-4o
+```
+
+See the [Configuration](#configuration) table for all variables and how the provider is selected.
 
 For private GitHub repositories, also set:
 

@@ -93,7 +93,7 @@ class HelpModal(Static):
             " [bold]j / k[/bold]  or  [bold]↑ / ↓[/bold]   navigate clusters\n"
             " [bold]Enter[/bold]              drill into cluster\n"
             " [bold]Space[/bold]              mark cluster reviewed\n"
-            " [bold]r[/bold]                  regenerate clustering\n"
+            " [bold]r[/bold]                  regenerate (re-run same model)\n"
             " [bold]?[/bold]                  toggle this help\n"
             " [bold]Esc / q[/bold]            back / quit"
         )

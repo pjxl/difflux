@@ -65,19 +65,27 @@ def _check_api_key(provider: str | None, model: str) -> None:
             sys.exit(1)
 
     if provider == "anthropic" and not ANTHROPIC_API_KEY:
-        print("difflux: ANTHROPIC_API_KEY is not set.", file=sys.stderr)
+        print(
+            f"difflux: model '{model}' requires ANTHROPIC_API_KEY, which is not set.",
+            file=sys.stderr,
+        )
         print(
             "  export ANTHROPIC_API_KEY=sk-ant-...  (get a key at https://console.anthropic.com/)",
             file=sys.stderr,
         )
+        print("  Or use an OpenAI model: difflux --model gpt-4o", file=sys.stderr)
         sys.exit(1)
 
     if provider == "openai" and not OPENAI_API_KEY:
-        print("difflux: OPENAI_API_KEY is not set.", file=sys.stderr)
+        print(
+            f"difflux: model '{model}' requires OPENAI_API_KEY, which is not set.",
+            file=sys.stderr,
+        )
         print(
             "  export OPENAI_API_KEY=sk-...  (get a key at https://platform.openai.com/)",
             file=sys.stderr,
         )
+        print("  Or use an Anthropic model: difflux --model claude-opus-4-8", file=sys.stderr)
         sys.exit(1)
 
 
@@ -112,17 +120,25 @@ def main() -> None:
         print(f"difflux: {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        # Catch auth errors and other SDK exceptions
-        print(f"difflux: {e}", file=sys.stderr)
+        msg = str(e).lower()
+        if "401" in msg or "authentication" in msg or "api_key" in msg:
+            print("difflux: your API key was rejected — check it at the provider console.", file=sys.stderr)
+        elif "403" in msg or "permission" in msg or "not found" in msg:
+            print(
+                f"difflux: your account may not have access to model '{model}' — try a different model.",
+                file=sys.stderr,
+            )
+        else:
+            print(f"difflux: {e}", file=sys.stderr)
         sys.exit(1)
 
     use_tui = not args.no_tui and sys.stdout.isatty()
 
     if use_tui:
         from difflux.tui.app import DiffluxApp
-        app = DiffluxApp(session=session, regenerate=run_clustering)
+        app = DiffluxApp(session=session, regenerate=run_clustering, model=model)
         app.run()
         n_reviewed = sum(1 for v in session.clusters if v.reviewed)
-        print(f"Reviewed {n_reviewed} clusters, {session.total_files} files")
+        print(f"Reviewed {n_reviewed} clusters, {session.total_files} files with {model}")
     else:
-        print(render_overview(session))
+        print(render_overview(session, model))
