@@ -69,7 +69,7 @@ For plain-text output instead of the TUI:
 git diff HEAD~1 | difflux --no-tui
 ```
 
-On first run, difflux will prompt for your API key and save it. To pre-set it instead (useful for scripts or CI):
+On first run with nothing configured, difflux launches a short **setup wizard**: it asks how you reach a model (Direct Anthropic, Direct OpenAI, or a custom gateway), then the model and your API key. Your answers are saved to `~/.config/difflux/config.toml`, so you're not asked again — no environment variables to re-export each session. To configure non-interactively instead (scripts/CI), set environment variables, which always take precedence:
 
 ```sh
 export ANTHROPIC_API_KEY=sk-ant-...  # Anthropic (default)
@@ -90,7 +90,7 @@ export OPENAI_API_KEY=sk-...         # OpenAI — also pass --model gpt-4o
 
 ## How it works
 
-`difflux` numbers each hunk in the diff and sends them to a Claude model with a structured-output prompt. The model identifies conceptual clusters, assigns each hunk to one, orders the clusters in the reading sequence that best builds understanding (entry point → core logic → edge handling → tests), and writes a one-sentence summary per cluster. The result is a two-phase TUI: an overview listing all clusters with their summaries, hunk counts, and file counts; and a drill-down view that shows the actual diff hunks for a selected cluster, gathered from wherever in the file tree they happen to live.
+`difflux` numbers each hunk in the diff and sends them to a language model with a structured-output prompt. The model identifies conceptual clusters, assigns each hunk to one, orders the clusters in the reading sequence that best builds understanding (entry point → core logic → edge handling → tests), and writes a one-sentence summary per cluster. The result is a two-phase TUI: an overview listing all clusters with their summaries, hunk counts, and file counts; and a drill-down view that shows the actual diff hunks for a selected cluster, gathered from wherever in the file tree they happen to live.
 
 ## Configuration
 
@@ -108,22 +108,24 @@ export OPENAI_API_KEY=sk-...         # OpenAI — also pass --model gpt-4o
 ### Using a custom gateway (e.g. LiteLLM)
 
 `DIFFLUX_BASE_URL` (or `--base-url`) points difflux at any OpenAI- or
-Anthropic-compatible gateway instead of the vendor's default endpoint. The key you
-enter on first run is sent to that gateway.
+Anthropic-compatible gateway instead of the vendor's default endpoint. The easiest way
+to set this up is the first-run wizard — choose **Custom gateway** and enter the gateway
+URL, model, and your key (all saved to the config file). The key is then sent to that gateway.
 
 #### At Etsy (LiteLLM)
 
 Etsy developers don't use direct vendor API keys — route difflux through the LiteLLM
-gateway, which is OpenAI-compatible:
+gateway, which is OpenAI-compatible. In the wizard, pick **Custom gateway**; or configure
+it non-interactively:
 
 ```sh
 export DIFFLUX_PROVIDER=openai
 export DIFFLUX_BASE_URL=<litellm-gateway-url>   # confirm in #gen-ai-help
 export DIFFLUX_MODEL=<model-exposed-by-litellm>
-export OPENAI_API_KEY=<your-litellm-key>        # from go/litellmkey, or enter on first run
+export OPENAI_API_KEY=<your-litellm-key>        # from go/litellmkey
 ```
 
-Set `DIFFLUX_PROVIDER=openai` even when the underlying model is Claude — LiteLLM speaks
+Use the OpenAI provider even when the underlying model is Claude — LiteLLM speaks
 the OpenAI API. Confirm the gateway URL and available model names in `#gen-ai-help`
 (LiteLLM keys are minted via `go/litellmkey`).
 
