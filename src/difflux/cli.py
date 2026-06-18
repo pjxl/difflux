@@ -37,6 +37,13 @@ def _make_arg_parser() -> argparse.ArgumentParser:
              "Also set via DIFFLUX_BASE_URL env var.",
     )
     p.add_argument("--no-tui", action="store_true", help="Print plain text instead of launching the TUI.")
+    p.add_argument(
+        "--reconfigure",
+        "--setup",
+        dest="reconfigure",
+        action="store_true",
+        help="Force the first-run setup wizard to run again, even if a config already exists.",
+    )
     return p
 
 
@@ -112,8 +119,41 @@ def _needs_setup(*, no_tui: bool) -> bool:
     return not load_config_file()
 
 
+def _run_reconfigure(*, no_tui: bool) -> None:
+    """Run the setup wizard on demand and exit — no diff required.
+
+    `difflux --reconfigure` is a pure setup action: it does not read a diff and
+    does not cluster, it just (re)collects provider/base-url/model/key and saves.
+    """
+    if no_tui or not sys.stdout.isatty():
+        print("difflux: --reconfigure requires an interactive terminal.", file=sys.stderr)
+        sys.exit(1)
+    # If a diff was piped, FD 0 is the pipe; give the TUI a live keyboard.
+    if not sys.__stdin__.isatty():
+        try:
+            import os as _os
+            _tty = open("/dev/tty")
+            _os.dup2(_tty.fileno(), sys.__stdin__.fileno())
+            _tty.close()
+        except OSError:
+            pass
+    from difflux.tui.setup import SetupWizardApp, apply_setup
+    result = SetupWizardApp(default_anthropic_model=DEFAULT_MODEL).run()
+    if result is None:
+        print("difflux: setup cancelled.", file=sys.stderr)
+        sys.exit(1)
+    apply_setup(result)
+    print("difflux: configuration saved.")
+
+
 def main() -> None:
     args = _make_arg_parser().parse_args()
+
+    # --reconfigure is a standalone setup action: run the wizard and exit,
+    # without requiring a piped diff or source.
+    if args.reconfigure:
+        _run_reconfigure(no_tui=args.no_tui)
+        return
 
     # Consume stdin before any TUI launch (the diff may be piped in).
     try:
@@ -137,6 +177,7 @@ def main() -> None:
 
     # First-run setup wizard — only after stdin is drained and FD 0 is a live
     # keyboard (above), so the TUI never reads the piped diff as keystrokes.
+    # (--reconfigure is handled earlier and exits before this point.)
     if _needs_setup(no_tui=args.no_tui):
         from difflux.tui.setup import SetupWizardApp, apply_setup
         result = SetupWizardApp(default_anthropic_model=DEFAULT_MODEL).run()
@@ -181,7 +222,12 @@ def main() -> None:
                 # Loop back to re-prompt; _ensure_api_key will show the modal again.
             elif "403" in msg or "permission" in msg or "not found" in msg:
                 print(
-                    f"difflux: your account may not have access to model '{model}' — try a different model.",
+                    f"difflux: model '{model}' is unavailable (not found or no access).",
+                    file=sys.stderr,
+                )
+                print(
+                    "  pick another with --model <name>, run `difflux --reconfigure` to "
+                    "re-run setup, or edit ~/.config/difflux/config.toml",
                     file=sys.stderr,
                 )
                 sys.exit(1)

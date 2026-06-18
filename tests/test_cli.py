@@ -13,7 +13,14 @@ class _StopMain(Exception):
 
 
 def _fake_args(**overrides):
-    defaults = dict(source=None, model=None, provider=None, base_url=None, no_tui=False)
+    defaults = dict(
+        source=None,
+        model=None,
+        provider=None,
+        base_url=None,
+        no_tui=False,
+        reconfigure=False,
+    )
     defaults.update(overrides)
     return MagicMock(**defaults)
 
@@ -113,3 +120,58 @@ def test_setup_skipped_when_not_needed(monkeypatch):
         cli.main()
 
     assert calls == ["diff", "parse"]
+
+
+def _setup_reconfigure(monkeypatch, calls, *, wizard_result):
+    """Shared wiring for the --reconfigure path: interactive, no diff stubbing."""
+    monkeypatch.setattr(
+        cli,
+        "_make_arg_parser",
+        lambda: MagicMock(parse_args=lambda: _fake_args(reconfigure=True)),
+    )
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    fake_stdin = MagicMock()
+    fake_stdin.isatty.return_value = True  # interactive; no pipe, no reattach
+    monkeypatch.setattr(sys, "__stdin__", fake_stdin)
+
+    # --reconfigure must NOT touch the diff path at all.
+    def no_diff(source):
+        raise AssertionError("--reconfigure must not require a diff")
+
+    monkeypatch.setattr(cli, "_resolve_diff", no_diff)
+
+    class FakeWizard:
+        def __init__(self, **kwargs):
+            pass
+
+        def run(self):
+            calls.append("wizard")
+            return wizard_result
+
+    monkeypatch.setattr("difflux.tui.setup.SetupWizardApp", FakeWizard)
+    monkeypatch.setattr(
+        "difflux.tui.setup.apply_setup", lambda r: calls.append("apply")
+    )
+
+
+def test_reconfigure_runs_wizard_and_persists_without_diff(monkeypatch):
+    """--reconfigure runs the wizard and saves, without requiring a piped diff
+    or source (regression: it used to bail out in _resolve_diff)."""
+    calls: list[str] = []
+    _setup_reconfigure(monkeypatch, calls, wizard_result=object())
+
+    cli.main()  # returns normally on success — no diff, no clustering
+
+    assert calls == ["wizard", "apply"]
+
+
+def test_reconfigure_cancel_exits_without_persisting(monkeypatch):
+    """Cancelling the wizard (returns None) exits non-zero and saves nothing."""
+    calls: list[str] = []
+    _setup_reconfigure(monkeypatch, calls, wizard_result=None)
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 1
+    assert calls == ["wizard"]  # no "apply"
