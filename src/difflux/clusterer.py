@@ -141,14 +141,21 @@ def _truncate_hunks(hunks: list[Hunk]) -> list[Hunk]:
     rendered = render_hunks(hunks)
     est_tokens = len(rendered) // 4
     if est_tokens > TOKEN_CEILING:
+        dropped: list[Hunk] = []
         while hunks and len(render_hunks(hunks)) // 4 > TOKEN_CEILING:
-            dropped_hunk = hunks.pop()
-        print(
-            f"Warning: diff too large for context window; truncated at hunk {hunks[-1].id} "
-            f"(estimated {len(render_hunks(hunks)) // 4:,} tokens). "
-            f"Hunk {dropped_hunk.id} and later excluded.",
-            file=sys.stderr,
-        )
+            dropped.append(hunks.pop())
+        if hunks:
+            print(
+                f"Warning: diff too large for context window; truncated at hunk {hunks[-1].id} "
+                f"(estimated {len(render_hunks(hunks)) // 4:,} tokens). "
+                f"IDs {dropped[-1].id}–{dropped[0].id} excluded.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "Warning: diff too large for context window; all hunks exceeded token ceiling and were excluded.",
+                file=sys.stderr,
+            )
 
     return hunks
 
@@ -186,3 +193,9 @@ def _validate_hunk_ids(result: ClusteringResult, hunks: list[Hunk]) -> None:
             raise ClusteringError(
                 f"Cluster '{c.id}' references unknown hunk IDs: {bad}"
             )
+    assigned_ids = {i for c in result.clusters for i in c.hunk_ids}
+    missing = sorted(valid_ids - assigned_ids)
+    if missing:
+        raise ClusteringError(
+            f"The following hunk IDs were not assigned to any cluster: {missing}"
+        )

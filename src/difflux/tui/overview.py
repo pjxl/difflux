@@ -9,6 +9,7 @@ from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import Static, Footer, LoadingIndicator
 from textual.containers import VerticalScroll
+from textual.worker import Worker, WorkerState
 
 from difflux.enrich import ClusterView, ReviewSession
 from difflux.tui.widgets import ClusterCard, HelpModal
@@ -135,11 +136,19 @@ class OverviewScreen(Screen):
 
     def action_regen(self) -> None:
         self.mount(LoadingIndicator())
-        self.run_worker(self._do_regen, exclusive=True)
+        self._regen_worker = self.run_worker(self._do_regen, exclusive=True, exit_on_error=False)
 
     async def _do_regen(self) -> None:
         new_session = await asyncio.to_thread(self._regenerate)
         self.post_message(self.ClusteringComplete(new_session))
+
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        if event.state == WorkerState.ERROR:
+            try:
+                self.query_one(LoadingIndicator).remove()
+            except Exception:
+                pass
+            self.notify(str(event.worker.error), severity="error")
 
     @on(ClusteringComplete)
     def on_clustering_complete(self, event: ClusteringComplete) -> None:
@@ -148,6 +157,7 @@ class OverviewScreen(Screen):
         except Exception:
             pass
         self.session = event.session
+        self.app.session = event.session
         self._focused_index = 0
         self._rebuild_list()
 

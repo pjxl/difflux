@@ -11,6 +11,20 @@ from difflux.enrich import build_session
 from difflux.render_text import render_overview
 
 
+def _reopen_stdin_for_tui() -> None:
+    """Redirect FD 0 to /dev/tty so Textual sees a live keyboard after stdin was a pipe."""
+    if sys.__stdin__.isatty():
+        return
+    try:
+        _tty = open("/dev/tty")
+        try:
+            os.dup2(_tty.fileno(), sys.__stdin__.fileno())
+        finally:
+            _tty.close()
+    except OSError:
+        pass
+
+
 def _make_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="difflux",
@@ -129,14 +143,7 @@ def _run_reconfigure(*, no_tui: bool) -> None:
         print("difflux: --reconfigure requires an interactive terminal.", file=sys.stderr)
         sys.exit(1)
     # If a diff was piped, FD 0 is the pipe; give the TUI a live keyboard.
-    if not sys.__stdin__.isatty():
-        try:
-            import os as _os
-            _tty = open("/dev/tty")
-            _os.dup2(_tty.fileno(), sys.__stdin__.fileno())
-            _tty.close()
-        except OSError:
-            pass
+    _reopen_stdin_for_tui()
     from difflux.tui.setup import SetupWizardApp, apply_setup
     result = SetupWizardApp(default_anthropic_model=DEFAULT_MODEL).run()
     if result is None:
@@ -166,14 +173,7 @@ def main() -> None:
     # driver reads from sys.__stdin__.fileno() (always FD 0) — reassigning
     # sys.stdin has no effect. Use dup2 to redirect FD 0 to /dev/tty so
     # Textual sees a live keyboard device.
-    if not sys.__stdin__.isatty():
-        try:
-            import os as _os
-            _tty = open("/dev/tty")
-            _os.dup2(_tty.fileno(), sys.__stdin__.fileno())
-            _tty.close()
-        except OSError:
-            pass
+    _reopen_stdin_for_tui()
 
     # First-run setup wizard — only after stdin is drained and FD 0 is a live
     # keyboard (above), so the TUI never reads the piped diff as keystrokes.
@@ -241,7 +241,7 @@ def main() -> None:
         from difflux.tui.app import DiffluxApp
         app = DiffluxApp(session=session, regenerate=run_clustering, model=model, provider=provider)
         app.run()
-        n_reviewed = sum(1 for v in session.clusters if v.reviewed)
-        print(f"Reviewed {n_reviewed} clusters, {session.total_files} files with {model}")
+        n_reviewed = sum(1 for v in app.session.clusters if v.reviewed)
+        print(f"Reviewed {n_reviewed} clusters, {app.session.total_files} files with {model}")
     else:
         print(render_overview(session, model))
