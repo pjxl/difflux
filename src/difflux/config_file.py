@@ -73,6 +73,12 @@ def get_wallet() -> dict[str, dict[str, str]]:
     return load_config_file().get("keys", {})
 
 
+# TODO(#5 org distribution): an internal install wrapper could pre-seed
+# [defaults] for a whole org (e.g. Etsy LiteLLM: provider/base_url/model) by
+# calling save_defaults(...) at install time, so users skip the first-run
+# wizard entirely. Keep Etsy/org specifics OUT of this repo — the wrapper lives
+# in an internal channel and only calls this public API. See the menu/plan in
+# ~/.claude/plans/onboarding-friction-3-4-5.md (#5).
 def save_defaults(
     *,
     provider: str | None = None,
