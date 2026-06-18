@@ -36,7 +36,11 @@ _pipx:
 	fi
 
 install:
-	pipx install -e . --python python3.11 --force
+	# pipx ignores -e for this src/ layout, so it installs a snapshot. Install
+	# normally to create the venv + entrypoint, then overlay a real PEP 660
+	# editable install (hatchling) into that same venv so difflux tracks src/.
+	pipx install . --python python3.11 --force
+	pipx runpip difflux install -e . --no-deps
 
 $(VENV): _python311
 	python3.11 -m venv $(VENV)
