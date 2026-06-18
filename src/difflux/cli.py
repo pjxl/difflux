@@ -4,7 +4,7 @@ import argparse
 import os
 import sys
 
-from difflux.config import DEFAULT_MODEL, DIFFLUX_BASE_URL, DIFFLUX_PROVIDER, GITHUB_TOKEN
+from difflux.config import DEFAULT_MODEL, GITHUB_TOKEN
 from difflux.clusterer import ClusteringError, detect_provider
 from difflux.hunks import HunkIndex, parse_diff
 from difflux.enrich import build_session
@@ -102,13 +102,20 @@ def _ensure_api_key(provider: str, model: str, *, no_tui: bool, base_url: str | 
     save_api_key(provider, key)
 
 
+def _needs_setup(*, no_tui: bool) -> bool:
+    """True only on a cold start: interactive, TUI allowed, no key, no config file."""
+    if no_tui or not sys.stdout.isatty():
+        return False
+    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENAI_API_KEY"):
+        return False
+    from difflux.config_file import load_config_file
+    return not load_config_file()
+
+
 def main() -> None:
     args = _make_arg_parser().parse_args()
-    model = args.model or DEFAULT_MODEL
-    provider = _resolve_provider(args.provider or DIFFLUX_PROVIDER or None, model)
-    base_url = args.base_url or DIFFLUX_BASE_URL or None
 
-    # Consume stdin before any TUI launch
+    # Consume stdin before any TUI launch (the diff may be piped in).
     try:
         diff_text = _resolve_diff(args.source)
     except RuntimeError as e:
@@ -127,6 +134,20 @@ def main() -> None:
             _tty.close()
         except OSError:
             pass
+
+    # First-run setup wizard — only after stdin is drained and FD 0 is a live
+    # keyboard (above), so the TUI never reads the piped diff as keystrokes.
+    if _needs_setup(no_tui=args.no_tui):
+        from difflux.tui.setup import SetupWizardApp, apply_setup
+        result = SetupWizardApp(default_anthropic_model=DEFAULT_MODEL).run()
+        if result is not None:
+            apply_setup(result)
+
+    # Resolve from LIVE os.environ — the wizard above may have just set these,
+    # whereas the config module constants were computed at import time.
+    model = args.model or os.environ.get("DIFFLUX_MODEL") or DEFAULT_MODEL
+    provider = _resolve_provider(args.provider or os.environ.get("DIFFLUX_PROVIDER") or None, model)
+    base_url = args.base_url or os.environ.get("DIFFLUX_BASE_URL") or None
 
     hunks = parse_diff(diff_text)
     if not hunks:
