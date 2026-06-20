@@ -74,6 +74,8 @@ def test_file_count_not_in_schema():
     cluster_props = schema["$defs"]["Cluster"]["properties"]
     assert "file_count" not in cluster_props
     assert "line_count" not in cluster_props
+    assert "added" not in cluster_props
+    assert "removed" not in cluster_props
     assert "position" not in cluster_props
 
 

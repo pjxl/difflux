@@ -11,8 +11,13 @@ class ClusterView:
     cluster: Cluster
     hunks: list[Hunk]
     file_count: int
-    line_count: int
+    added: int
+    removed: int
     reviewed: bool = False
+
+    @property
+    def churn(self) -> int:
+        return self.added + self.removed
 
 
 @dataclass
@@ -30,17 +35,15 @@ def build_session(result: ClusteringResult, index: HunkIndex) -> ReviewSession:
     for c in result.clusters:
         resolved = index.by_ids(c.hunk_ids)
         file_count = len({h.file_path for h in resolved})
-        line_count = sum(
-            1
-            for h in resolved
-            for line in h.body.splitlines()
-            if line.startswith(("+", "-"))
-        )
+        lines = [line for h in resolved for line in h.body.splitlines()]
+        added = sum(1 for line in lines if line.startswith("+"))
+        removed = sum(1 for line in lines if line.startswith("-"))
         views.append(ClusterView(
             cluster=c,
             hunks=resolved,
             file_count=file_count,
-            line_count=line_count,
+            added=added,
+            removed=removed,
         ))
 
     all_hunk_ids = {hid for c in result.clusters for hid in c.hunk_ids}

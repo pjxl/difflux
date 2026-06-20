@@ -51,22 +51,28 @@ def test_file_count_computed_locally():
     assert session.clusters[0].file_count == 2  # a.py and b.py
 
 
-def test_line_count_counts_plus_and_minus_lines():
+def test_added_and_removed_count_plus_and_minus_lines():
     body = "+added\n-removed\n context\n+also added"
     hunks = [_hunk(1, body=body)]
     index = HunkIndex(hunks)
     result = _result([_cluster("c1", "Name", [1])])
     session = build_session(result, index)
-    assert session.clusters[0].line_count == 3  # 2 "+" lines + 1 "-" line
+    view = session.clusters[0]
+    assert view.added == 2  # 2 "+" lines
+    assert view.removed == 1  # 1 "-" line
+    assert view.churn == 3
 
 
-def test_line_count_excludes_context_lines():
+def test_added_and_removed_exclude_context_lines():
     body = " context only\n context also"
     hunks = [_hunk(1, body=body)]
     index = HunkIndex(hunks)
     result = _result([_cluster("c1", "Name", [1])])
     session = build_session(result, index)
-    assert session.clusters[0].line_count == 0
+    view = session.clusters[0]
+    assert view.added == 0
+    assert view.removed == 0
+    assert view.churn == 0
 
 
 def test_total_files_across_clusters():

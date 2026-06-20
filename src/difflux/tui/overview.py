@@ -18,6 +18,13 @@ from difflux.tui.widgets import ClusterCard, HelpModal
 class OverviewScreen(Screen):
     """Phase one: navigable cluster list."""
 
+    DEFAULT_CSS = """
+    OverviewScreen #overview-banner {
+        color: $warning;
+        padding: 0 0 1 0;
+    }
+    """
+
     BINDINGS = [
         ("j,down", "move_down", "Down"),
         ("k,up", "move_up", "Up"),
@@ -52,6 +59,7 @@ class OverviewScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Static(id="overview-header")
+        yield Static(id="overview-banner", markup=False)
         yield Static(id="rule-top", markup=False)
         with VerticalScroll(id="cluster-list"):
             pass
@@ -63,24 +71,42 @@ class OverviewScreen(Screen):
 
     def _rebuild_list(self) -> None:
         s = self.session
-        header = self.query_one("#overview-header", Static)
-        header.update(
-            f"[bold]difflux[/bold]  ·  {self.model}  ·  {len(s.clusters)} clusters  ·  {s.total_files} files",
-        )
+        self._update_header()
+        self._update_banner()
         rule = "─" * 58
         self.query_one("#rule-top", Static).update(rule)
         self.query_one("#rule-bottom", Static).update(rule)
 
+        max_churn = max((v.churn for v in s.clusters), default=0)
         container = self.query_one("#cluster-list", VerticalScroll)
         container.remove_children()
         for i, view in enumerate(s.clusters):
-            card = ClusterCard(view, i + 1, id=f"card-{i}")
+            card = ClusterCard(view, i + 1, max_churn=max_churn, id=f"card-{i}")
             container.mount(card)
 
-        if s.coverage:
-            container.mount(Static(f"\n[dim]Coverage note: {s.coverage}[/dim]", markup=True))
-
         self._focus_card(self._focused_index)
+
+    def _update_header(self) -> None:
+        s = self.session
+        reviewed = sum(1 for v in s.clusters if v.reviewed)
+        self.query_one("#overview-header", Static).update(
+            f"[bold]difflux[/bold]  ·  {self.model}  ·  {len(s.clusters)} clusters"
+            f"  ·  {s.total_files} files  ·  {reviewed}/{len(s.clusters)} reviewed",
+        )
+
+    def _update_banner(self) -> None:
+        s = self.session
+        banner = self.query_one("#overview-banner", Static)
+        parts = []
+        if s.note:
+            parts.append(f"Note: {s.note}")
+        if s.coverage:
+            parts.append(f"Coverage: {s.coverage}")
+        if parts:
+            banner.update("\n".join(parts))
+            banner.display = True
+        else:
+            banner.display = False
 
     def _focus_card(self, index: int) -> None:
         cards = self.query(ClusterCard)
@@ -105,16 +131,20 @@ class OverviewScreen(Screen):
         index = self._focused_index
         view = self.session.clusters[index]
         from difflux.tui.drilldown import DrillDownScreen
-        self.app.push_screen(
-            DrillDownScreen(view),
-            lambda reviewed: cards[index].sync_reviewed() if reviewed else None,
-        )
+
+        def _on_drill_closed(reviewed: bool) -> None:
+            if reviewed:
+                cards[index].sync_reviewed()
+                self._update_header()
+
+        self.app.push_screen(DrillDownScreen(view), _on_drill_closed)
 
     def action_toggle_reviewed(self) -> None:
         cards = list(self.query(ClusterCard))
         if not cards:
             return
         cards[self._focused_index].toggle_reviewed()
+        self._update_header()
 
     def action_help(self) -> None:
         if self._help_visible:
