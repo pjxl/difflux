@@ -226,3 +226,6 @@ Do not implement these. They are out of scope.
 - **Streaming LLM output into the TUI.** v1 does one blocking call (offloaded to a thread)
   with a spinner. The full response is available before any rendering begins.
 - **Caching LLM results across sessions or multi-model fallback.**
+
+## Agent activity log
+- 2026-06-20: Reviewed `src/difflux/hunks.py` and summarized its functionality for the user.
