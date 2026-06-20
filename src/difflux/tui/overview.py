@@ -23,6 +23,9 @@ class OverviewScreen(Screen):
         color: $warning;
         padding: 0 0 1 0;
     }
+    OverviewScreen #cluster-list {
+        height: 1fr;
+    }
     """
 
     BINDINGS = [

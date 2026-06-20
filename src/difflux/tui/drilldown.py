@@ -12,6 +12,12 @@ from difflux.tui.widgets import HunkBlock
 class DrillDownScreen(Screen):
     """Phase two: hunks for a single cluster."""
 
+    DEFAULT_CSS = """
+    DrillDownScreen #hunk-scroll {
+        height: 1fr;
+    }
+    """
+
     BINDINGS = [
         ("escape,q", "go_back", "Back"),
         ("space", "toggle_reviewed", "Mark reviewed"),
