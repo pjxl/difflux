@@ -66,10 +66,10 @@ class OverviewScreen(Screen):
         yield Static(id="rule-bottom", markup=False)
         yield Footer()
 
-    def on_mount(self) -> None:
-        self._rebuild_list()
+    async def on_mount(self) -> None:
+        await self._rebuild_list()
 
-    def _rebuild_list(self) -> None:
+    async def _rebuild_list(self) -> None:
         s = self.session
         self._update_header()
         self._update_banner()
@@ -79,10 +79,13 @@ class OverviewScreen(Screen):
 
         max_churn = max((v.churn for v in s.clusters), default=0)
         container = self.query_one("#cluster-list", VerticalScroll)
-        container.remove_children()
-        for i, view in enumerate(s.clusters):
-            card = ClusterCard(view, i + 1, max_churn=max_churn, id=f"card-{i}")
-            container.mount(card)
+        await container.remove_children()
+        cards = [
+            ClusterCard(view, i + 1, max_churn=max_churn, id=f"card-{i}")
+            for i, view in enumerate(s.clusters)
+        ]
+        if cards:
+            await container.mount(*cards)
 
         self._focus_card(self._focused_index)
 
@@ -181,7 +184,7 @@ class OverviewScreen(Screen):
             self.notify(str(event.worker.error), severity="error")
 
     @on(ClusteringComplete)
-    def on_clustering_complete(self, event: ClusteringComplete) -> None:
+    async def on_clustering_complete(self, event: ClusteringComplete) -> None:
         try:
             self.query_one(LoadingIndicator).remove()
         except Exception:
@@ -189,7 +192,7 @@ class OverviewScreen(Screen):
         self.session = event.session
         self.app.session = event.session
         self._focused_index = 0
-        self._rebuild_list()
+        await self._rebuild_list()
 
     def action_quit_app(self) -> None:
         self.app.exit()
