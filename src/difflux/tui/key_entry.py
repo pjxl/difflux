@@ -21,6 +21,11 @@ _META: dict[str, dict[str, str]] = {
         "url": "https://platform.openai.com/",
         "placeholder": "sk-...",
     },
+    "github": {
+        "label": "GitHub Token Required",
+        "url": "https://github.com/settings/tokens",
+        "placeholder": "ghp_... or gho_...",
+    },
 }
 
 

@@ -175,3 +175,41 @@ def test_reconfigure_cancel_exits_without_persisting(monkeypatch):
 
     assert exc.value.code == 1
     assert calls == ["wizard"]  # no "apply"
+
+
+def test_public_pr_no_token_prompt(monkeypatch):
+    """Regression: a public GitHub PR URL with no GITHUB_TOKEN must not trigger
+    the token prompt — the anonymous fetch should be attempted first."""
+    monkeypatch.setattr(
+        cli,
+        "_make_arg_parser",
+        lambda: MagicMock(
+            parse_args=lambda: _fake_args(
+                source="https://github.com/owner/repo/pull/1",
+                no_tui=True,
+            )
+        ),
+    )
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+
+    monkeypatch.setattr(
+        cli,
+        "_resolve_diff",
+        lambda source: "diff --git a/x b/x\n@@ -1 +1 @@\n-a\n+b\n",
+    )
+    monkeypatch.setattr(
+        cli,
+        "_ensure_github_token",
+        lambda *, no_tui: (_ for _ in ()).throw(
+            AssertionError("_ensure_github_token must not be called for a successful public PR fetch")
+        ),
+    )
+    monkeypatch.setattr(cli, "_needs_setup", lambda *, no_tui: False)
+    monkeypatch.setattr(cli, "parse_diff", lambda text: (_ for _ in ()).throw(_StopMain()))
+
+    fake_stdin = MagicMock()
+    fake_stdin.isatty.return_value = True
+    monkeypatch.setattr(sys, "__stdin__", fake_stdin)
+
+    with pytest.raises(_StopMain):
+        cli.main()

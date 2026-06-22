@@ -4,7 +4,7 @@ import argparse
 import os
 import sys
 
-from difflux.config import DEFAULT_MODEL, GITHUB_TOKEN
+from difflux.config import DEFAULT_MODEL
 from difflux.clusterer import ClusteringError, detect_provider
 from difflux.hunks import HunkIndex, parse_diff
 from difflux.enrich import build_session
@@ -72,7 +72,7 @@ def _resolve_diff(source: str | None) -> str:
 
     from difflux.sources.github import is_github_pr_url, fetch_pr_diff
     if is_github_pr_url(source):
-        return fetch_pr_diff(source, token=GITHUB_TOKEN)
+        return fetch_pr_diff(source, token=os.environ.get("GITHUB_TOKEN"))
 
     print(f"difflux: unrecognised source '{source}'. Expected a GitHub PR URL or no argument (stdin).", file=sys.stderr)
     sys.exit(1)
@@ -87,6 +87,32 @@ def _resolve_provider(provider_arg: str | None, model: str) -> str:
     except ClusteringError as e:
         print(f"difflux: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+def _ensure_github_token(*, no_tui: bool) -> None:
+    """Guarantee GITHUB_TOKEN is in os.environ. Prompts if missing. Never persists."""
+    if os.environ.get("GITHUB_TOKEN"):
+        return
+    use_tui = not no_tui and sys.stdout.isatty()
+    if use_tui:
+        from difflux.tui.key_entry import KeyEntryApp
+        token = KeyEntryApp("github").run()
+    else:
+        import getpass
+        print(
+            "difflux: GitHub token required for private repos"
+            " (https://github.com/settings/tokens)",
+            file=sys.stderr,
+        )
+        try:
+            token = getpass.getpass("GITHUB_TOKEN: ")
+        except (KeyboardInterrupt, EOFError):
+            token = None
+    token = (token or "").strip()
+    if not token:
+        print("difflux: no token provided, exiting.", file=sys.stderr)
+        sys.exit(1)
+    os.environ["GITHUB_TOKEN"] = token
 
 
 def _ensure_api_key(provider: str, model: str, *, no_tui: bool, base_url: str | None = None) -> None:
@@ -163,11 +189,26 @@ def main() -> None:
         return
 
     # Consume stdin before any TUI launch (the diff may be piped in).
-    try:
-        diff_text = _resolve_diff(args.source)
-    except RuntimeError as e:
-        print(f"difflux: {e}", file=sys.stderr)
-        sys.exit(1)
+    # GitHub PR URLs get a token re-prompt loop; stdin and bad sources exit immediately.
+    from difflux.sources.github import is_github_pr_url, GithubAuthError
+    if args.source and is_github_pr_url(args.source):
+        while True:
+            try:
+                diff_text = _resolve_diff(args.source)
+                break
+            except GithubAuthError as e:
+                os.environ.pop("GITHUB_TOKEN", None)
+                print(f"difflux: {e}", file=sys.stderr)
+                _ensure_github_token(no_tui=args.no_tui)
+            except RuntimeError as e:
+                print(f"difflux: {e}", file=sys.stderr)
+                sys.exit(1)
+    else:
+        try:
+            diff_text = _resolve_diff(args.source)
+        except RuntimeError as e:
+            print(f"difflux: {e}", file=sys.stderr)
+            sys.exit(1)
 
     # After reading a piped diff, stdin (FD 0) is at EOF. Textual's Linux
     # driver reads from sys.__stdin__.fileno() (always FD 0) — reassigning

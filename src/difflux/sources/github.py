@@ -9,6 +9,10 @@ _PR_PATTERN = re.compile(
 )
 
 
+class GithubAuthError(RuntimeError):
+    pass
+
+
 def is_github_pr_url(s: str) -> bool:
     return bool(_PR_PATTERN.match(s.strip()))
 
@@ -31,8 +35,12 @@ def fetch_pr_diff(url: str, *, token: str | None = None) -> str:
     except httpx.RequestError as e:
         raise RuntimeError(f"Network error fetching PR diff: {e}") from e
 
+    if resp.status_code == 401:
+        raise GithubAuthError("GitHub token rejected.")
     if resp.status_code == 404:
-        raise RuntimeError("PR not found. Check the URL and set GITHUB_TOKEN for private repos.")
+        if not token:
+            raise GithubAuthError("PR not found — may be private. Provide a GITHUB_TOKEN with repo scope.")
+        raise RuntimeError("PR not found. Check the URL.")
     if resp.status_code == 406:
         raise RuntimeError("GitHub diff too large. Use: git diff | difflux instead.")
     try:
