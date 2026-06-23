@@ -152,13 +152,15 @@ def _ensure_api_key(provider: str, model: str, *, no_tui: bool, base_url: str | 
 
 
 def _needs_setup(*, no_tui: bool) -> bool:
-    """True only on a cold start: interactive, TUI allowed, no key, no config file."""
+    """True only on a cold start: interactive, TUI allowed, no LLM key or defaults configured."""
     if no_tui or not sys.stdout.isatty():
         return False
     if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENAI_API_KEY"):
         return False
     from difflux.config_file import load_config_file
-    return not load_config_file()
+    data = load_config_file()
+    keys = data.get("keys", {})
+    return not (keys.get("anthropic") or keys.get("openai") or data.get("defaults"))
 
 
 def _run_reconfigure(*, no_tui: bool) -> None:
@@ -199,9 +201,10 @@ def main() -> None:
                 diff_text = _resolve_diff(args.source)
                 break
             except GithubAuthError as e:
-                os.environ.pop("GITHUB_TOKEN", None)
-                from difflux.config_file import delete_api_key
-                delete_api_key("github")
+                failed_token = os.environ.pop("GITHUB_TOKEN", None)
+                from difflux.config_file import get_wallet, delete_api_key
+                if failed_token and failed_token == get_wallet().get("github", {}).get("key", ""):
+                    delete_api_key("github")
                 print(f"difflux: {e}", file=sys.stderr)
                 _ensure_github_token(no_tui=args.no_tui)
             except RuntimeError as e:
