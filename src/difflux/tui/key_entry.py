@@ -8,7 +8,7 @@ from textual.widgets import Input, Static
 
 from difflux.tui._shared import _DIALOG_CSS
 
-_PROVIDERS = ["anthropic", "openai"]
+_PROVIDERS = ["anthropic", "openai", "github"]
 
 _META: dict[str, dict[str, str]] = {
     "anthropic": {

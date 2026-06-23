@@ -11,6 +11,7 @@ CONFIG_FILE = CONFIG_DIR / "config.toml"
 _ENV_VAR: dict[str, str] = {
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
+    "github": "GITHUB_TOKEN",
 }
 
 _DEFAULTS_ENV_VAR: dict[str, str] = {

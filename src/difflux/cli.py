@@ -90,7 +90,7 @@ def _resolve_provider(provider_arg: str | None, model: str) -> str:
 
 
 def _ensure_github_token(*, no_tui: bool) -> None:
-    """Guarantee GITHUB_TOKEN is in os.environ. Prompts if missing. Never persists."""
+    """Guarantee GITHUB_TOKEN is in os.environ. Prompts if missing and persists the result."""
     if os.environ.get("GITHUB_TOKEN"):
         return
     use_tui = not no_tui and sys.stdout.isatty()
@@ -113,6 +113,8 @@ def _ensure_github_token(*, no_tui: bool) -> None:
         print("difflux: no token provided, exiting.", file=sys.stderr)
         sys.exit(1)
     os.environ["GITHUB_TOKEN"] = token
+    from difflux.config_file import save_api_key
+    save_api_key("github", token)
 
 
 def _ensure_api_key(provider: str, model: str, *, no_tui: bool, base_url: str | None = None) -> None:
@@ -198,6 +200,8 @@ def main() -> None:
                 break
             except GithubAuthError as e:
                 os.environ.pop("GITHUB_TOKEN", None)
+                from difflux.config_file import delete_api_key
+                delete_api_key("github")
                 print(f"difflux: {e}", file=sys.stderr)
                 _ensure_github_token(no_tui=args.no_tui)
             except RuntimeError as e:
