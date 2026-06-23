@@ -93,6 +93,11 @@ def _ensure_github_token(*, no_tui: bool) -> None:
     """Guarantee GITHUB_TOKEN is in os.environ. Prompts if missing and persists the result."""
     if os.environ.get("GITHUB_TOKEN"):
         return
+    import subprocess
+    result = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True)
+    if result.returncode == 0 and result.stdout.strip():
+        os.environ["GITHUB_TOKEN"] = result.stdout.strip()
+        return
     use_tui = not no_tui and sys.stdout.isatty()
     if use_tui:
         from difflux.tui.key_entry import KeyEntryApp
