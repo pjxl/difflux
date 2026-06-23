@@ -59,3 +59,10 @@ class DiffluxApp(App):
             self.push_screen(SingleIdeaScreen(self.session))
         else:
             self.push_screen(OverviewScreen(self.session, self._regenerate, self.model, self.provider))
+
+    def on_app_focus(self) -> None:
+        self.call_next(self._reassert_focus)
+
+    def _reassert_focus(self) -> None:
+        if self.focused is not None:
+            self.focused.focus()

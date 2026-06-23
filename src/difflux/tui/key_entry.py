@@ -66,6 +66,13 @@ class KeyEntryApp(App[str | None]):
     def on_mount(self) -> None:
         self.query_one("#key-input", Input).focus()
 
+    def on_app_focus(self) -> None:
+        self.call_next(self._reassert_focus)
+
+    def _reassert_focus(self) -> None:
+        if self.focused is not None:
+            self.focused.focus()
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         key = event.value.strip()
         if key:

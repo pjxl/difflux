@@ -151,6 +151,13 @@ class SetupWizardApp(App[SetupResult | None]):
     def on_mount(self) -> None:
         self._focus_choice(0)
 
+    def on_app_focus(self) -> None:
+        self.call_next(self._reassert_focus)
+
+    def _reassert_focus(self) -> None:
+        if self.focused is not None:
+            self.focused.focus()
+
     def _choice_widgets(self) -> list[Static]:
         return list(self.query(".choice"))
 
