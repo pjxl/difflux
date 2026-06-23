@@ -89,14 +89,24 @@ def _resolve_provider(provider_arg: str | None, model: str) -> str:
         sys.exit(1)
 
 
+def _try_load_github_token() -> bool:
+    """Silently populate GITHUB_TOKEN from env or the gh CLI. Returns True if found."""
+    if os.environ.get("GITHUB_TOKEN"):
+        return True
+    import subprocess
+    try:
+        result = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            os.environ["GITHUB_TOKEN"] = result.stdout.strip()
+            return True
+    except FileNotFoundError:
+        pass
+    return False
+
+
 def _ensure_github_token(*, no_tui: bool) -> None:
     """Guarantee GITHUB_TOKEN is in os.environ. Prompts if missing and persists the result."""
-    if os.environ.get("GITHUB_TOKEN"):
-        return
-    import subprocess
-    result = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True)
-    if result.returncode == 0 and result.stdout.strip():
-        os.environ["GITHUB_TOKEN"] = result.stdout.strip()
+    if _try_load_github_token():
         return
     use_tui = not no_tui and sys.stdout.isatty()
     if use_tui:
@@ -201,6 +211,7 @@ def main() -> None:
     # GitHub PR URLs get a token re-prompt loop; stdin and bad sources exit immediately.
     from difflux.sources.github import is_github_pr_url, GithubAuthError
     if args.source and is_github_pr_url(args.source):
+        _try_load_github_token()
         while True:
             try:
                 diff_text = _resolve_diff(args.source)
