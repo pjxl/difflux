@@ -22,7 +22,9 @@ _META: dict[str, dict[str, str]] = {
         "placeholder": "sk-...",
     },
     "github": {
-        "label": "GitHub Token Required",
+        "label": "GitHub",
+        "title": "GitHub Token Required",
+        "hint": "Get your token at https://github.com/settings/tokens",
         "url": "https://github.com/settings/tokens",
         "placeholder": "ghp_... or gho_...",
     },
@@ -54,8 +56,10 @@ class KeyEntryApp(App[str | None]):
                 yield Static("Get your key from your provider or gateway admin", id="hint")
                 yield Input(placeholder="API key", password=True, id="key-input")
             else:
-                yield Static(f"[bold]difflux — {meta['label']} API Key Required[/bold]", markup=True)
-                yield Static(f"Get your key at {meta['url']}", id="hint")
+                title = meta.get("title", f"{meta['label']} API Key Required")
+                hint = meta.get("hint", f"Get your key at {meta['url']}")
+                yield Static(f"[bold]difflux — {title}[/bold]", markup=True)
+                yield Static(hint, id="hint")
                 yield Input(placeholder=meta["placeholder"], password=True, id="key-input")
             yield Static("[dim]Enter  save · Esc  quit without saving[/dim]", markup=True, id="tip")
 
